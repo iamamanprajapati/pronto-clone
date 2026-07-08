@@ -1,0 +1,27 @@
+{
+  "expo": {
+    "name": "Pronto",
+    "slug": "pronto-customer",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "We use your location to find experts near you."
+      }
+    },
+    "android": {
+      "package": "com.pronto.customer",
+      "permissions": [
+        "ACCESS_FINE_LOCATION"
+      ]
+    },
+    "extra": {
+      "apiUrl": "http://localhost:4000"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}

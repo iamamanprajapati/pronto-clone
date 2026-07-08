@@ -1,0 +1,596 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ───────────────────────── Identity ─────────────────────────
+
+enum UserRole {
+  CUSTOMER
+  WORKER
+  ADMIN
+}
+
+model User {
+  id        String   @id @default(cuid())
+  phone     String   @unique
+  name      String?
+  email     String?
+  role      UserRole @default(CUSTOMER)
+  banned    Boolean  @default(false)
+  fraudFlag Boolean  @default(false)
+  referralCode String @unique @default(cuid())
+  referredBy   String?
+  creditsPaise Int    @default(0)
+  createdAt DateTime @default(now())
+
+  addresses  Address[]
+  bookings   Booking[]
+  worker     Worker?
+  ratingsGiven Rating[] @relation("rater")
+  tickets    Ticket[]
+  notifications Notification[]
+  blockedWorkers BlockedWorker[]
+  favouriteWorkers FavouriteWorker[]
+}
+
+model Address {
+  id       String  @id @default(cuid())
+  userId   String
+  user     User    @relation(fields: [userId], references: [id])
+  tag      String  @default("Home")
+  lat      Float
+  lng      Float
+  flat     String
+  landmark String?
+  deleted  Boolean @default(false)
+  bookings Booking[]
+}
+
+// ───────────────────────── Geography ─────────────────────────
+
+model City {
+  id     String  @id @default(cuid())
+  name   String  @unique
+  active Boolean @default(true)
+  zones  Zone[]
+  hubs   Hub[]
+  pricing Pricing[]
+  admins AdminUser[]
+}
+
+model Zone {
+  id      String  @id @default(cuid())
+  cityId  String
+  city    City    @relation(fields: [cityId], references: [id])
+  name    String
+  polygon Json    // [[lat,lng], ...] ring
+  active  Boolean @default(true)
+  bookings Booking[]
+  hubs    Hub[]
+}
+
+model Hub {
+  id       String @id @default(cuid())
+  cityId   String
+  city     City   @relation(fields: [cityId], references: [id])
+  zoneId   String?
+  zone     Zone?  @relation(fields: [zoneId], references: [id])
+  name     String
+  lat      Float
+  lng      Float
+  capacity Int    @default(10)
+  workers  Worker[]
+  shifts   Shift[]
+  admins   AdminUser[]
+}
+
+// ───────────────────────── Workforce ─────────────────────────
+
+enum WorkerStatus {
+  NEW
+  UNDER_REVIEW
+  TRAINING
+  ACTIVE
+  SUSPENDED
+  TERMINATED
+}
+
+enum DutyStatus {
+  OFF_DUTY
+  IDLE
+  OFFERED
+  EN_ROUTE
+  ON_JOB
+}
+
+model Worker {
+  id         String       @id @default(cuid())
+  userId     String       @unique
+  user       User         @relation(fields: [userId], references: [id])
+  status     WorkerStatus @default(NEW)
+  duty       DutyStatus   @default(OFF_DUTY)
+  hubId      String?
+  hub        Hub?         @relation(fields: [hubId], references: [id])
+  skills     String[]     // service category slugs
+  languages  String[]
+  photoUrl   String?
+  rating     Float        @default(5)
+  ratingCount Int         @default(0)
+  jobsDone   Int          @default(0)
+  strikes    Int          @default(0)
+  bankAccount String?
+  bankIfsc    String?
+  upiId       String?
+  createdAt  DateTime     @default(now())
+
+  kycDocs      KycDoc[]
+  trainings    TrainingProgress[]
+  shifts       Shift[]
+  attendance   Attendance[]
+  leaves       Leave[]
+  offers       Offer[]
+  bookings     Booking[]
+  earnings     Earning[]
+  sosEvents    SosEvent[]
+  blockedBy    BlockedWorker[]
+  favouritedBy FavouriteWorker[]
+}
+
+enum KycStatus {
+  PENDING
+  SUBMITTED
+  APPROVED
+  REJECTED
+}
+
+model KycDoc {
+  id       String    @id @default(cuid())
+  workerId String
+  worker   Worker    @relation(fields: [workerId], references: [id])
+  docType  String    // AADHAAR | PAN | SELFIE
+  docRef   String    // storage key / masked number
+  status   KycStatus @default(SUBMITTED)
+  reason   String?
+  reviewedBy String?
+  createdAt DateTime @default(now())
+}
+
+model TrainingModule {
+  id       String @id @default(cuid())
+  title    String
+  contentUrl String
+  quiz     Json   // [{q, options[], answerIdx}]
+  passPct  Int    @default(70)
+  order    Int    @default(0)
+  active   Boolean @default(true)
+  progress TrainingProgress[]
+}
+
+model TrainingProgress {
+  id       String  @id @default(cuid())
+  workerId String
+  worker   Worker  @relation(fields: [workerId], references: [id])
+  moduleId String
+  module   TrainingModule @relation(fields: [moduleId], references: [id])
+  scorePct Int?
+  passed   Boolean @default(false)
+  at       DateTime @default(now())
+
+  @@unique([workerId, moduleId])
+}
+
+model Shift {
+  id       String   @id @default(cuid())
+  workerId String
+  worker   Worker   @relation(fields: [workerId], references: [id])
+  hubId    String
+  hub      Hub      @relation(fields: [hubId], references: [id])
+  startAt  DateTime
+  endAt    DateTime
+  attendance Attendance[]
+}
+
+model Attendance {
+  id         String    @id @default(cuid())
+  workerId   String
+  worker     Worker    @relation(fields: [workerId], references: [id])
+  shiftId    String?
+  shift      Shift?    @relation(fields: [shiftId], references: [id])
+  checkinAt  DateTime  @default(now())
+  checkinLat Float
+  checkinLng Float
+  checkoutAt DateTime?
+}
+
+enum LeaveStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model Leave {
+  id       String      @id @default(cuid())
+  workerId String
+  worker   Worker      @relation(fields: [workerId], references: [id])
+  fromDate DateTime
+  toDate   DateTime
+  reason   String
+  status   LeaveStatus @default(PENDING)
+  decidedBy String?
+}
+
+// ───────────────────────── Catalog ─────────────────────────
+
+model Service {
+  id          String  @id @default(cuid())
+  slug        String  @unique
+  name        String
+  category    String
+  icon        String  @default("broom")
+  baseMinutes Int     @default(30)
+  active      Boolean @default(true)
+  order       Int     @default(0)
+}
+
+model Pricing {
+  id              String @id @default(cuid())
+  cityId          String
+  city            City   @relation(fields: [cityId], references: [id])
+  durationMin     Int
+  pricePaise      Int
+  surgeMultiplier Float  @default(1)
+
+  @@unique([cityId, durationMin])
+}
+
+model Coupon {
+  id          String   @id @default(cuid())
+  code        String   @unique
+  description String
+  discountPct Int      @default(0)
+  discountPaise Int    @default(0)
+  maxDiscountPaise Int @default(10000)
+  minOrderPaise Int    @default(0)
+  firstBookingOnly Boolean @default(false)
+  usageLimit  Int      @default(0) // 0 = unlimited
+  usedCount   Int      @default(0)
+  expiresAt   DateTime?
+  active      Boolean  @default(true)
+}
+
+// ───────────────────────── Bookings ─────────────────────────
+
+enum BookingStatus {
+  CREATED
+  PAYMENT_PENDING
+  SEARCHING
+  ASSIGNED
+  EN_ROUTE
+  ARRIVED
+  IN_PROGRESS
+  COMPLETED
+  RATED
+  NO_EXPERT_FOUND
+  CANCELLED_CUSTOMER
+  CANCELLED_WORKER
+  CANCELLED_ADMIN
+  CANCELLED_SYSTEM
+}
+
+model Booking {
+  id           String        @id @default(cuid())
+  customerId   String
+  customer     User          @relation(fields: [customerId], references: [id])
+  addressId    String
+  address      Address       @relation(fields: [addressId], references: [id])
+  zoneId       String
+  zone         Zone          @relation(fields: [zoneId], references: [id])
+  status       BookingStatus @default(CREATED)
+  tasks        String[]      // service slugs
+  durationMin  Int
+  scheduledAt  DateTime?     // null = instant
+  instructions String?
+  workerId     String?
+  worker       Worker?       @relation(fields: [workerId], references: [id])
+  otp          String?
+  offerRound   Int           @default(0)
+
+  basePaise      Int
+  extensionPaise Int @default(0)
+  discountPaise  Int @default(0)
+  tipPaise       Int @default(0)
+  lateFeePaise   Int @default(0)
+  totalPaise     Int
+  couponCode     String?
+
+  startedAt   DateTime?
+  timerEndsAt DateTime?
+  completedAt DateTime?
+  createdAt   DateTime @default(now())
+
+  events   BookingEvent[]
+  offers   Offer[]
+  payments Payment[]
+  ratings  Rating[]
+  earnings Earning[]
+  sosEvents SosEvent[]
+  tickets  Ticket[]
+
+  @@index([status])
+  @@index([customerId, createdAt])
+}
+
+model BookingEvent {
+  id         String   @id @default(cuid())
+  bookingId  String
+  booking    Booking  @relation(fields: [bookingId], references: [id])
+  fromStatus String
+  toStatus   String
+  actor      String   // system | customer:{id} | worker:{id} | admin:{id}
+  meta       Json?
+  at         DateTime @default(now())
+
+  @@index([bookingId, at])
+}
+
+enum OfferResponse {
+  PENDING
+  ACCEPTED
+  DECLINED
+  TIMEOUT
+  WITHDRAWN
+}
+
+model Offer {
+  id        String        @id @default(cuid())
+  bookingId String
+  booking   Booking       @relation(fields: [bookingId], references: [id])
+  workerId  String
+  worker    Worker        @relation(fields: [workerId], references: [id])
+  round     Int
+  payoutPaise Int
+  distanceM Int
+  expiresAt DateTime
+  response  OfferResponse @default(PENDING)
+  reason    String?
+  createdAt DateTime      @default(now())
+}
+
+// ───────────────────────── Money ─────────────────────────
+
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  REFUNDED
+  PARTIAL_REFUND
+}
+
+model Payment {
+  id         String        @id @default(cuid())
+  bookingId  String
+  booking    Booking       @relation(fields: [bookingId], references: [id])
+  gatewayRef String?
+  method     String        @default("upi")
+  amountPaise Int
+  refundPaise Int          @default(0)
+  status     PaymentStatus @default(PENDING)
+  purpose    String        @default("booking") // booking | extension | tip
+  idempotencyKey String?   @unique
+  createdAt  DateTime      @default(now())
+}
+
+model Earning {
+  id        String  @id @default(cuid())
+  workerId  String
+  worker    Worker  @relation(fields: [workerId], references: [id])
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  basePaise Int
+  incentivePaise Int @default(0)
+  tipPaise  Int     @default(0)
+  totalPaise Int
+  payoutRunId String?
+  payoutRun PayoutRun? @relation(fields: [payoutRunId], references: [id])
+  createdAt DateTime @default(now())
+}
+
+enum PayoutRunStatus {
+  DRAFT
+  APPROVED
+  DISBURSED
+}
+
+model PayoutRun {
+  id         String          @id @default(cuid())
+  cycleLabel String
+  status     PayoutRunStatus @default(DRAFT)
+  totalPaise Int             @default(0)
+  createdBy  String
+  approvedBy String?
+  createdAt  DateTime        @default(now())
+  earnings   Earning[]
+}
+
+model IncentiveRule {
+  id          String  @id @default(cuid())
+  name        String
+  jobsTarget  Int     // e.g. 5 jobs/day
+  bonusPaise  Int
+  active      Boolean @default(true)
+}
+
+// ───────────────────────── Quality & Trust ─────────────────────────
+
+model Rating {
+  id        String  @id @default(cuid())
+  bookingId String
+  booking   Booking @relation(fields: [bookingId], references: [id])
+  raterId   String
+  rater     User    @relation("rater", fields: [raterId], references: [id])
+  direction String  // customer_to_worker | worker_to_customer
+  stars     Int
+  tags      String[]
+  comment   String?
+  createdAt DateTime @default(now())
+
+  @@unique([bookingId, direction])
+}
+
+model BlockedWorker {
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  workerId String
+  worker   Worker @relation(fields: [workerId], references: [id])
+
+  @@id([userId, workerId])
+}
+
+model FavouriteWorker {
+  userId   String
+  user     User   @relation(fields: [userId], references: [id])
+  workerId String
+  worker   Worker @relation(fields: [workerId], references: [id])
+
+  @@id([userId, workerId])
+}
+
+// ───────────────────────── Safety ─────────────────────────
+
+enum SosStatus {
+  OPEN
+  ACKNOWLEDGED
+  RESOLVED
+}
+
+model SosEvent {
+  id         String    @id @default(cuid())
+  workerId   String?
+  worker     Worker?   @relation(fields: [workerId], references: [id])
+  bookingId  String?
+  booking    Booking?  @relation(fields: [bookingId], references: [id])
+  raisedBy   String    // worker | customer | system:overrun
+  lat        Float?
+  lng        Float?
+  status     SosStatus @default(OPEN)
+  assignedTo String?
+  resolution String?
+  timeline   Json      @default("[]")
+  createdAt  DateTime  @default(now())
+}
+
+// ───────────────────────── Support & Comms ─────────────────────────
+
+enum TicketStatus {
+  OPEN
+  IN_PROGRESS
+  RESOLVED
+  CLOSED
+}
+
+model Ticket {
+  id        String       @id @default(cuid())
+  userId    String
+  user      User         @relation(fields: [userId], references: [id])
+  bookingId String?
+  booking   Booking?     @relation(fields: [bookingId], references: [id])
+  subject   String
+  status    TicketStatus @default(OPEN)
+  assignedTo String?
+  messages  TicketMessage[]
+  createdAt DateTime     @default(now())
+}
+
+model TicketMessage {
+  id       String   @id @default(cuid())
+  ticketId String
+  ticket   Ticket   @relation(fields: [ticketId], references: [id])
+  author   String   // user:{id} | admin:{id}
+  body     String
+  at       DateTime @default(now())
+}
+
+model Notification {
+  id      String   @id @default(cuid())
+  userId  String
+  user    User     @relation(fields: [userId], references: [id])
+  title   String
+  body    String
+  channel String   @default("push") // push | sms | whatsapp
+  read    Boolean  @default(false)
+  at      DateTime @default(now())
+}
+
+model Announcement {
+  id       String   @id @default(cuid())
+  audience String   @default("workers") // workers | customers
+  title    String
+  body     String
+  active   Boolean  @default(true)
+  at       DateTime @default(now())
+}
+
+model Banner {
+  id       String  @id @default(cuid())
+  imageUrl String
+  title    String
+  deeplink String?
+  active   Boolean @default(true)
+  order    Int     @default(0)
+}
+
+// ───────────────────────── Platform ─────────────────────────
+
+enum AdminRole {
+  SUPER_ADMIN
+  CITY_OPS
+  HUB_SUPERVISOR
+  SUPPORT
+  FINANCE
+  VERIFIER
+}
+
+model AdminUser {
+  id       String    @id @default(cuid())
+  email    String    @unique
+  name     String
+  passwordHash String
+  role     AdminRole
+  cityId   String?
+  city     City?     @relation(fields: [cityId], references: [id])
+  hubId    String?
+  hub      Hub?      @relation(fields: [hubId], references: [id])
+  active   Boolean   @default(true)
+  createdAt DateTime @default(now())
+}
+
+model AuditLog {
+  id      String   @id @default(cuid())
+  adminId String
+  action  String
+  entity  String
+  entityId String?
+  before  Json?
+  after   Json?
+  at      DateTime @default(now())
+
+  @@index([entity, entityId])
+}
+
+model FeatureFlag {
+  key     String  @id
+  value   Json
+  updatedAt DateTime @updatedAt
+}
+
+model OtpCode {
+  phone     String   @id
+  code      String
+  attempts  Int      @default(0)
+  expiresAt DateTime
+}

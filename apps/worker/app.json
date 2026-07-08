@@ -1,0 +1,30 @@
+{
+  "expo": {
+    "name": "Pronto Expert",
+    "slug": "pronto-worker",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "ios": {
+      "supportsTablet": false,
+      "infoPlist": {
+        "NSLocationWhenInUseUsageDescription": "Location is used to assign nearby jobs while you are on duty.",
+        "NSLocationAlwaysAndWhenInUseUsageDescription": "Location is used to assign nearby jobs while you are on duty."
+      }
+    },
+    "android": {
+      "package": "com.pronto.worker",
+      "permissions": [
+        "ACCESS_FINE_LOCATION",
+        "ACCESS_BACKGROUND_LOCATION",
+        "FOREGROUND_SERVICE"
+      ]
+    },
+    "extra": {
+      "apiUrl": "http://localhost:4000"
+    },
+    "plugins": [
+      "expo-font"
+    ]
+  }
+}
