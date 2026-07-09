@@ -12,6 +12,9 @@ interface AppState {
   zone: Zone | null;
   setZone: (z: Zone | null) => void;
 
+  currentLocation: { lat: number; lng: number } | null;
+  setCurrentLocation: (l: { lat: number; lng: number } | null) => void;
+
   addresses: Address[];
   setAddresses: (a: Address[]) => void;
   selectedAddress: Address | null;
@@ -38,6 +41,8 @@ export const useStore = create<AppState>(set => ({
   setUser: user => set({ user }),
   zone: null,
   setZone: zone => set({ zone }),
+  currentLocation: null,
+  setCurrentLocation: currentLocation => set({ currentLocation }),
   addresses: [],
   setAddresses: addresses => set({ addresses }),
   selectedAddress: null,

@@ -1,6 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
 import { db } from '../db';
+import { config } from '../config';
+import { anchorKey, redis } from '../redis';
+import { requireAuth } from '../middleware/auth';
 import { h, HttpError } from '../middleware/errors';
 import { pointInPolygon } from '../lib/geo';
 
@@ -12,12 +15,29 @@ export async function zoneForPoint(lat: number, lng: number) {
   return zones.find(z => pointInPolygon(lat, lng, z.polygon as number[][])) ?? null;
 }
 
+async function setAnchor(zoneId: string, lat: number, lng: number) {
+  if (config.isDev) await redis.set(anchorKey(zoneId), JSON.stringify({ lat, lng }), 'EX', 3600);
+}
+
 catalogRouter.get('/serviceability', h(async (req, res) => {
   const { lat, lng } = z.object({ lat: z.coerce.number(), lng: z.coerce.number() }).parse(req.query);
-  const zone = await zoneForPoint(lat, lng);
+  let zone = await zoneForPoint(lat, lng);
+  // In dev, treat anywhere as serviceable (fall back to the demo zone) so the
+  // app works regardless of the tester's real location.
+  if (!zone && config.isDev) {
+    zone = await db.zone.findFirst({ where: { active: true }, include: { city: true } });
+  }
+  if (zone) await setAnchor(zone.id, lat, lng);
   res.json(zone
     ? { serviceable: true, zone: { id: zone.id, name: zone.name, cityId: zone.cityId, cityName: zone.city.name } }
     : { serviceable: false, zone: null });
+}));
+
+/** Customer reports its live location so nearby experts anchor to it (dev demo). */
+catalogRouter.post('/anchor', requireAuth('CUSTOMER'), h(async (req, res) => {
+  const { zoneId, lat, lng } = z.object({ zoneId: z.string(), lat: z.number(), lng: z.number() }).parse(req.body);
+  await setAnchor(zoneId, lat, lng);
+  res.json({ ok: true });
 }));
 
 catalogRouter.get('/services', h(async (_req, res) => {

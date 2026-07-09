@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { Alert, Text, TextInput, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { AppMap } from '../AppMap';
 import { api } from '../api';
 import { useStore } from '../store';
 import { Btn, C, Muted } from '../ui';
@@ -27,14 +27,16 @@ export default function AddAddressScreen({ navigation }: any) {
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
-      <MapView
-        style={{ height: 260 }}
-        initialRegion={{ ...pin, latitudeDelta: 0.01, longitudeDelta: 0.01 }}
-        onPress={e => setPin(e.nativeEvent.coordinate)}>
-        <Marker draggable coordinate={pin} onDragEnd={e => setPin(e.nativeEvent.coordinate)} />
-      </MapView>
+      <View style={{ height: 260 }}>
+        <AppMap
+          center={{ lat: pin.latitude, lng: pin.longitude }}
+          delta={0.01}
+          markers={[{ id: 'pin', lat: pin.latitude, lng: pin.longitude, kind: 'pin', label: 'Your entrance' }]}
+          onPress={p => setPin({ latitude: p.lat, longitude: p.lng })}
+        />
+      </View>
       <View style={{ padding: 16, gap: 10 }}>
-        <Muted>Tap or drag the pin to your entrance</Muted>
+        <Muted>Tap the map to place the pin at your entrance</Muted>
         <TextInput style={inp} placeholder="Flat / house no. & building *" value={flat} onChangeText={setFlat} />
         <TextInput style={inp} placeholder="Landmark (optional)" value={landmark} onChangeText={setLandmark} />
         <View style={{ flexDirection: 'row', gap: 8 }}>

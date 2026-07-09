@@ -6,9 +6,21 @@ import { api, rupees, fmtTime } from '../../../../lib/api';
 export default function Worker360() {
   const { id } = useParams<{ id: string }>();
   const [w, setW] = useState<any>(null);
+  const [hubs, setHubs] = useState<any[]>([]);
   const load = () => api<{ worker: any }>(`/v1/admin/workers/${id}`).then(r => setW(r.worker));
-  useEffect(() => { load(); }, [id]);
+  useEffect(() => {
+    load();
+    api<{ cities: any[] }>('/v1/admin/cities')
+      .then(r => setHubs(r.cities.flatMap(c => c.hubs.map((h: any) => ({ ...h, cityName: c.name })))))
+      .catch(() => {});
+  }, [id]);
   if (!w) return <div className="muted">Loading…</div>;
+
+  async function assignHub(hubId: string) {
+    if (!hubId) return;
+    await api(`/v1/admin/workers/${id}/status`, { method: 'POST', body: JSON.stringify({ hubId }) })
+      .then(load).catch(e => alert(e.message));
+  }
 
   async function kyc(docId: string, approve: boolean) {
     const reason = approve ? undefined : prompt('Rejection reason:') ?? undefined;
@@ -29,6 +41,15 @@ export default function Worker360() {
         {w.status === 'ACTIVE' && <button className="danger" onClick={() => setStatus('SUSPENDED')}>Suspend</button>}
         {w.status === 'SUSPENDED' && <button className="danger" onClick={() => setStatus('TERMINATED')}>Terminate</button>}
         <button className="ghost" onClick={() => setStatus('TRAINING')}>Force retraining</button>
+        <select
+          style={{ width: 220 }}
+          value={w.hubId ?? ''}
+          onChange={e => assignHub(e.target.value)}>
+          <option value="" disabled>{w.hub ? `Hub: ${w.hub.name}` : 'Assign hub…'}</option>
+          {hubs.map(h => (
+            <option key={h.id} value={h.id}>{h.name} · {h.cityName}</option>
+          ))}
+        </select>
       </div>
 
       <div className="split">

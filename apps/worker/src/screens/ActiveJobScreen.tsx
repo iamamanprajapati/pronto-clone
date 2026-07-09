@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { AppMap } from '../AppMap';
 import { api, rupees } from '../api';
 import { getSocket } from '../socket';
 import { useStore } from '../store';
@@ -73,9 +73,11 @@ export default function ActiveJobScreen({ route, navigation }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ height: 240 }}>
-        <MapView style={{ flex: 1 }} region={{ latitude: job.address.lat, longitude: job.address.lng, latitudeDelta: 0.008, longitudeDelta: 0.008 }}>
-          <Marker coordinate={{ latitude: job.address.lat, longitude: job.address.lng }} title="Customer" />
-        </MapView>
+        <AppMap
+          center={{ lat: job.address.lat, lng: job.address.lng }}
+          delta={0.008}
+          markers={[{ id: 'cust', lat: job.address.lat, lng: job.address.lng, kind: 'pin', label: 'Customer' }]}
+        />
       </View>
       <ScrollView contentContainerStyle={{ padding: 16, gap: 12 }}>
         <Card>

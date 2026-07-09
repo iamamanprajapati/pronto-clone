@@ -4,7 +4,8 @@ import {
   channels, DISPATCH_RADIUS_M, EV, MAX_OFFER_ROUNDS, OFFER_TTL_SECONDS, type JobOffer,
 } from '@pronto/shared';
 import { db } from '../db';
-import { geoKey, offerLockKey, redis } from '../redis';
+import { config } from '../config';
+import { geoKey, offerLockKey, routeKey, redis } from '../redis';
 import { emitTo } from '../realtime/gateway';
 import { transition, generateOtp } from './bookingService';
 import { requireAuth } from '../middleware/auth';
@@ -185,6 +186,22 @@ dispatchRouter.post('/offers/:id/respond', requireAuth('WORKER'), h(async (req, 
   await db.worker.update({ where: { id: offer.workerId }, data: { duty: 'EN_ROUTE' } });
   await redis.hset(`worker:${offer.workerId}:live`, 'duty', 'EN_ROUTE');
   await redis.del(offerLockKey(offer.workerId));
+
+  // Dev: seed a travel route so the worker animates from ~1km away to the
+  // customer's door, and the tracking screen can draw the path.
+  if (config.isDev) {
+    const b = await db.booking.findUnique({ where: { id: offer.bookingId }, include: { address: true } });
+    if (b) {
+      const theta = Math.random() * Math.PI * 2;
+      await redis.set(routeKey(b.id), JSON.stringify({
+        startLat: b.address.lat + 0.009 * Math.cos(theta),
+        startLng: b.address.lng + 0.009 * Math.sin(theta),
+        destLat: b.address.lat, destLng: b.address.lng,
+        startAt: Date.now(),
+      }), 'EX', 1800);
+    }
+  }
+
   await transition(offer.bookingId, 'ASSIGNED', { kind: 'worker', id: offer.workerId });
   await transition(offer.bookingId, 'EN_ROUTE', { kind: 'worker', id: offer.workerId });
   res.json({ ok: true, bookingId: offer.bookingId });

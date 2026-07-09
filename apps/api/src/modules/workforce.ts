@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { z } from 'zod';
 import { HUB_CHECKIN_GEOFENCE_M } from '@pronto/shared';
 import { db } from '../db';
+import { config } from '../config';
 import { geoKey, redis } from '../redis';
 import { requireAuth } from '../middleware/auth';
 import { h, HttpError } from '../middleware/errors';
@@ -130,7 +131,8 @@ workforceRouter.post('/duty', h(async (req, res) => {
   if (w.status !== 'ACTIVE') throw new HttpError(403, 'Account is not active');
 
   if (on) {
-    if (w.hub && distanceM(lat, lng, w.hub.lat, w.hub.lng) > HUB_CHECKIN_GEOFENCE_M) {
+    // geofence enforced in production only — dev machines are rarely near the seeded hub
+    if (!config.isDev && w.hub && distanceM(lat, lng, w.hub.lat, w.hub.lng) > HUB_CHECKIN_GEOFENCE_M) {
       throw new HttpError(400, `Check in within ${HUB_CHECKIN_GEOFENCE_M}m of ${w.hub.name}`);
     }
     const shift = await db.shift.findFirst({

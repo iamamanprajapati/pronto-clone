@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { Alert, Modal, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { AppMap } from '../AppMap';
 import { api, rupees } from '../api';
 import { getSocket, subscribe, unsubscribe } from '../socket';
 import { useStore } from '../store';
@@ -16,6 +16,7 @@ export default function TrackingScreen({ route, navigation }: any) {
   const { bookingId } = route.params;
   const [booking, setBooking] = useState<any>(null);
   const [workerPos, setWorkerPos] = useState<{ lat: number; lng: number; etaMin: number } | null>(null);
+  const [routeCoords, setRouteCoords] = useState<Array<{ lat: number; lng: number }>>([]);
   const [now, setNow] = useState(Date.now());
   const [rateOpen, setRateOpen] = useState(false);
   const setActiveBookingId = useStore(s => s.setActiveBookingId);
@@ -39,6 +40,29 @@ export default function TrackingScreen({ route, navigation }: any) {
       clearInterval(tick);
     };
   }, [bookingId]);
+
+  // Fetch a road-following route (worker → your door) and refresh as the worker moves.
+  useEffect(() => {
+    const dest = booking?.address;
+    const showRoute = booking && ['ASSIGNED', 'EN_ROUTE'].includes(booking.status) && workerPos && dest;
+    if (!showRoute) { setRouteCoords([]); return; }
+    let cancelled = false;
+    async function fetchRoute() {
+      try {
+        const url = `https://router.project-osrm.org/route/v1/driving/${workerPos!.lng},${workerPos!.lat};${dest.lng},${dest.lat}?overview=full&geometries=geojson`;
+        const r = await fetch(url);
+        const j = await r.json();
+        const coords = j?.routes?.[0]?.geometry?.coordinates;
+        if (!cancelled && Array.isArray(coords) && coords.length > 1) {
+          setRouteCoords(coords.map((c: [number, number]) => ({ lat: c[1], lng: c[0] })));
+          return;
+        }
+      } catch { /* fall through to straight line */ }
+      if (!cancelled) setRouteCoords([{ lat: workerPos!.lat, lng: workerPos!.lng }, { lat: dest.lat, lng: dest.lng }]);
+    }
+    fetchRoute();
+    return () => { cancelled = true; };
+  }, [booking?.status, workerPos?.lat, workerPos?.lng, booking?.address?.lat, booking?.address?.lng]);
 
   useEffect(() => {
     if (!booking) return;
@@ -85,19 +109,18 @@ export default function TrackingScreen({ route, navigation }: any) {
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       <View style={{ height: 300 }}>
-        <MapView style={{ flex: 1 }} region={{
-          latitude: workerPos?.lat ?? addr.lat, longitude: workerPos?.lng ?? addr.lng,
-          latitudeDelta: 0.01, longitudeDelta: 0.01,
-        }}>
-          <Marker coordinate={{ latitude: addr.lat, longitude: addr.lng }} title="You" pinColor={C.accent} />
-          {workerPos && (
-            <Marker coordinate={{ latitude: workerPos.lat, longitude: workerPos.lng }} title={booking.worker?.name}>
-              <View style={{ backgroundColor: C.accent, borderRadius: 18, padding: 6, borderWidth: 2, borderColor: 'white' }}>
-                <MCI name="account-wrench" size={18} color="white" />
-              </View>
-            </Marker>
-          )}
-        </MapView>
+        <AppMap
+          center={{
+            lat: workerPos ? (workerPos.lat + addr.lat) / 2 : addr.lat,
+            lng: workerPos ? (workerPos.lng + addr.lng) / 2 : addr.lng,
+          }}
+          delta={workerPos ? Math.max(0.012, Math.abs(workerPos.lat - addr.lat) * 2.2, Math.abs(workerPos.lng - addr.lng) * 2.2) : 0.01}
+          route={routeCoords}
+          markers={[
+            { id: 'me', lat: addr.lat, lng: addr.lng, kind: 'me', label: 'You' },
+            ...(workerPos ? [{ id: 'expert', lat: workerPos.lat, lng: workerPos.lng, kind: 'expert' as const, label: booking.worker?.name }] : []),
+          ]}
+        />
         <Pressable onPress={() => navigation.goBack()} style={{ position: 'absolute', top: 54, left: 16, backgroundColor: 'white', borderRadius: 20, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' }}>
           <Ionicons name="arrow-back" size={20} color={C.text} />
         </Pressable>

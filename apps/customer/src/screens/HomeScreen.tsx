@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, ScrollView, Text, View } from 'react-native';
-import MapView, { Marker } from 'react-native-maps';
+import { AppMap } from '../AppMap';
 import { useStore } from '../store';
 import { api } from '../api';
 import { getSocket, subscribe, unsubscribe } from '../socket';
@@ -14,7 +14,7 @@ const MAP_COLLAPSED = 52;
 interface SnapWorker { lat: number; lng: number; duty: string; skills: string[] }
 
 export default function HomeScreen({ navigation }: any) {
-  const { zone, selectedAddress, services, activeBookingId } = useStore();
+  const { zone, selectedAddress, currentLocation, services, activeBookingId } = useStore();
   const [workers, setWorkers] = useState<SnapWorker[]>([]);
   const [counts, setCounts] = useState({ idle: 0 });
   const [eta, setEta] = useState<number | null>(null);
@@ -41,12 +41,25 @@ export default function HomeScreen({ navigation }: any) {
 
   useEffect(() => { api('/v1/catalog/banners').then(r => setBanners(r.banners)).catch(() => {}); }, []);
 
+  // Tell the server where we are so nearby experts anchor to us (dev demo).
+  // Refreshed periodically in case the anchor's TTL lapses while the app is open.
+  useEffect(() => {
+    if (!zone || !currentLocation) return;
+    const post = () => api('/v1/catalog/anchor', {
+      method: 'POST',
+      body: JSON.stringify({ zoneId: zone.id, lat: currentLocation.lat, lng: currentLocation.lng }),
+    }).catch(() => {});
+    post();
+    const t = setInterval(post, 30_000);
+    return () => clearInterval(t);
+  }, [zone?.id, currentLocation?.lat, currentLocation?.lng]);
+
   function setMap(c: boolean) {
     setCollapsed(c);
     Animated.timing(mapH, { toValue: c ? MAP_COLLAPSED : MAP_EXPANDED, duration: 220, useNativeDriver: false }).start();
   }
 
-  const center = selectedAddress ?? { lat: 12.9116, lng: 77.6389 };
+  const center = currentLocation ?? selectedAddress ?? { lat: 12.9116, lng: 77.6389 };
   const categories = [...new Set(services.map(s => s.category))];
 
   return (
@@ -80,18 +93,13 @@ export default function HomeScreen({ navigation }: any) {
           </Pressable>
         ) : (
           <View style={{ flex: 1 }}>
-            <MapView
-              style={{ flex: 1 }}
-              region={{ latitude: center.lat, longitude: center.lng, latitudeDelta: 0.02, longitudeDelta: 0.02 }}>
-              <Marker coordinate={{ latitude: center.lat, longitude: center.lng }} title="You" pinColor={C.accent} />
-              {workers.map((w, i) => (
-                <Marker key={i} coordinate={{ latitude: w.lat, longitude: w.lng }} title="Expert nearby">
-                  <View style={{ backgroundColor: C.accent, borderRadius: 16, padding: 5, borderWidth: 2, borderColor: 'white' }}>
-                    <MCI name="account-wrench" size={16} color="white" />
-                  </View>
-                </Marker>
-              ))}
-            </MapView>
+            <AppMap
+              center={{ lat: center.lat, lng: center.lng }}
+              markers={[
+                { id: 'me', lat: center.lat, lng: center.lng, kind: 'me', label: 'You' },
+                ...workers.map((w, i) => ({ id: `w${i}`, lat: w.lat, lng: w.lng, kind: 'expert' as const, label: 'Expert nearby' })),
+              ]}
+            />
             <View style={{ position: 'absolute', top: 10, alignSelf: 'center', backgroundColor: 'white', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, elevation: 3, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
               <MCI name="flash" size={15} color={C.accent} />
               <Text style={{ fontWeight: '700', color: C.text }}>

@@ -11,11 +11,12 @@ const FALLBACK = { lat: 12.9121, lng: 77.6401 };
 
 export default function LocationGateScreen({ navigation }: any) {
   const [state, setState] = useState<'checking' | 'denied' | 'waitlist'>('checking');
-  const { setZone, setAddresses, setSelectedAddress, setServices } = useStore();
+  const { setZone, setAddresses, setSelectedAddress, setServices, setCurrentLocation } = useStore();
 
   async function check(lat: number, lng: number) {
     const r = await api(`/v1/catalog/serviceability?lat=${lat}&lng=${lng}`);
     if (!r.serviceable) return setState('waitlist');
+    setCurrentLocation({ lat, lng });      // remember real GPS so the map auto-centers on it
     setZone(r.zone);
     const [{ services }, { addresses }] = await Promise.all([
       api('/v1/catalog/services'),
@@ -56,6 +57,13 @@ export default function LocationGateScreen({ navigation }: any) {
             We're expanding fast. We'll notify you the moment experts go live near you.
           </Muted>
           <Btn title="Notify me" onPress={() => navigation.reset({ index: 0, routes: [{ name: 'Onboarding' }] })} style={{ alignSelf: 'stretch' }} />
+          <View style={{ height: 10 }} />
+          <Btn
+            kind="ghost"
+            title="Use demo area (HSR Layout)"
+            onPress={() => { setState('checking'); check(FALLBACK.lat, FALLBACK.lng).catch(() => setState('denied')); }}
+            style={{ alignSelf: 'stretch' }}
+          />
         </>
       ) : (
         <>

@@ -13,7 +13,8 @@ import { transition } from './bookingService';
 import { dispatchBooking, releaseWorker } from './dispatch';
 import { bookingTimersQueue } from '../jobs/queues';
 import { settleCompletion } from './earnings';
-import { redis } from '../redis';
+import { config } from '../config';
+import { anchorKey, redis } from '../redis';
 
 export const bookingsRouter = Router();
 
@@ -65,7 +66,20 @@ bookingsRouter.post('/', requireAuth('CUSTOMER'), h(async (req, res) => {
 
   const address = await db.address.findFirst({ where: { id: body.addressId, userId: req.auth!.sub } });
   if (!address) throw new HttpError(404, 'Address not found');
-  const zone = await zoneForPoint(address.lat, address.lng);
+  let zone = await zoneForPoint(address.lat, address.lng);
+
+  // Dev: move the destination to the customer's live location (the anchor) so the
+  // tracking map shows the right place and the worker heads to where they actually
+  // are. Falls back to the demo zone. Production requires a real serviceable address.
+  if (config.isDev) {
+    if (!zone) zone = await zoneForPoint(12.9116, 77.6389) ?? (await db.zone.findFirst({ where: { active: true }, include: { city: true } }));
+    const raw = zone && await redis.get(anchorKey(zone.id));
+    if (raw) {
+      const a = JSON.parse(raw) as { lat: number; lng: number };
+      await db.address.update({ where: { id: address.id }, data: { lat: a.lat, lng: a.lng } });
+      address.lat = a.lat; address.lng = a.lng;
+    }
+  }
   if (!zone) throw new HttpError(400, 'Address is outside our serviceable areas');
 
   const quote = await computeQuote({
