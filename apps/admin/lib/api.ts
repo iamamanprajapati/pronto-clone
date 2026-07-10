@@ -14,6 +14,7 @@ export function admin(): { id: string; name: string; role: string; cityId: strin
 
 export async function api<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
   const res = await fetch(`${API}${path}`, {
+    cache: 'no-store', // never serve a stale GET after a mutation
     ...opts,
     headers: {
       'Content-Type': 'application/json',

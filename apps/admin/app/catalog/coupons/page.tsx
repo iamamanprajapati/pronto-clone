@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api, rupees } from '../../../lib/api';
+import { useLiveData } from '../../../lib/useLiveData';
 
 export default function Coupons() {
   const [coupons, setCoupons] = useState<any[]>([]);
   const load = () => api<{ coupons: any[] }>('/v1/admin/coupons').then(r => setCoupons(r.coupons));
-  useEffect(() => { load(); }, []);
+  useLiveData(load);
 
   async function add() {
     const code = prompt('Code:'); if (!code) return;

@@ -1,10 +1,11 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api } from '../../../lib/api';
+import { useLiveData } from '../../../lib/useLiveData';
 
 export default function Workers() {
   const [workers, setWorkers] = useState<any[]>([]);
-  useEffect(() => { api<{ workers: any[] }>('/v1/admin/workers').then(r => setWorkers(r.workers)); }, []);
+  useLiveData(() => api<{ workers: any[] }>('/v1/admin/workers').then(r => setWorkers(r.workers)));
 
   return (
     <div>

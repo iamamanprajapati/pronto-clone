@@ -1,13 +1,16 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api, fmtTime } from '../../lib/api';
+import { useLiveData } from '../../lib/useLiveData';
 
 export default function SosConsole() {
   const [events, setEvents] = useState<any[]>([]);
   const [filter, setFilter] = useState('OPEN');
 
   const load = () => api<{ events: any[] }>(`/v1/safety/sos?status=${filter}`).then(r => setEvents(r.events));
-  useEffect(() => { load(); const t = setInterval(load, 8000); return () => clearInterval(t); }, [filter]);
+  useLiveData(load);
+  useEffect(() => { load(); /* immediate reload when the filter changes */ // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filter]);
 
   async function ack(id: string) { await api(`/v1/safety/sos/${id}/ack`, { method: 'POST' }); load(); }
   async function resolve(id: string) {

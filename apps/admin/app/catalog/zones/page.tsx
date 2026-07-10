@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api } from '../../../lib/api';
+import { useLiveData } from '../../../lib/useLiveData';
 
 export default function Zones() {
   const [cities, setCities] = useState<any[]>([]);
   const load = () => api<{ cities: any[] }>('/v1/admin/cities').then(r => setCities(r.cities));
-  useEffect(() => { load(); }, []);
+  useLiveData(load);
 
   async function addZone(cityId: string) {
     const name = prompt('Zone name:'); if (!name) return;

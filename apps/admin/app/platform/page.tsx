@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api, fmtTime } from '../../lib/api';
+import { useLiveData } from '../../lib/useLiveData';
 
 export default function Platform() {
   const [flags, setFlags] = useState<any[]>([]);
@@ -12,7 +13,7 @@ export default function Platform() {
     api<{ admins: any[] }>('/v1/admin/admins').then(r => setAdmins(r.admins)).catch(() => {}),
     api<{ logs: any[] }>('/v1/admin/audit').then(r => setLogs(r.logs)).catch(() => {}),
   ]);
-  useEffect(() => { load(); }, []);
+  useLiveData(load);
 
   async function editFlag(f: any) {
     const val = prompt(`Value for ${f.key} (JSON):`, JSON.stringify(f.value));

@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api, rupees, fmtTime } from '../../lib/api';
+import { useLiveData } from '../../lib/useLiveData';
 
 const STATUSES = ['', 'SEARCHING', 'ASSIGNED', 'EN_ROUTE', 'ARRIVED', 'IN_PROGRESS', 'COMPLETED', 'RATED', 'NO_EXPERT_FOUND', 'CANCELLED_CUSTOMER', 'CANCELLED_ADMIN'];
 
@@ -8,9 +9,11 @@ export default function Bookings() {
   const [bookings, setBookings] = useState<any[]>([]);
   const [status, setStatus] = useState('');
 
-  useEffect(() => {
+  const load = () =>
     api<{ bookings: any[] }>(`/v1/admin/bookings?take=100${status ? `&status=${status}` : ''}`)
       .then(r => setBookings(r.bookings));
+  useLiveData(load);
+  useEffect(() => { load(); /* reload on filter change */ // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [status]);
 
   return (

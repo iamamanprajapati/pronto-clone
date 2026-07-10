@@ -271,6 +271,11 @@ adminRouter.post('/customers/:id/flags', requireAdmin('CITY_OPS', 'SUPPORT'), h(
 
 // ───────────────────────── Catalog / pricing / zones / coupons ─────────────────────────
 
+adminRouter.get('/services', requireAdmin(), h(async (_req, res) => {
+  const services = await db.service.findMany({ orderBy: { order: 'asc' } });
+  res.json({ services });
+}));
+
 adminRouter.post('/services', requireAdmin('SUPER_ADMIN', 'CITY_OPS'), h(async (req, res) => {
   const body = z.object({
     slug: z.string(), name: z.string(), category: z.string(),

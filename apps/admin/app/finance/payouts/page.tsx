@@ -1,11 +1,12 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api, rupees, fmtTime } from '../../../lib/api';
+import { useLiveData } from '../../../lib/useLiveData';
 
 export default function Payouts() {
   const [runs, setRuns] = useState<any[]>([]);
   const load = () => api<{ runs: any[] }>('/v1/earnings/payout-runs').then(r => setRuns(r.runs)).catch(e => alert(e.message));
-  useEffect(() => { load(); }, []);
+  useLiveData(load);
 
   async function createRun() {
     const cycleLabel = prompt('Cycle label (e.g. "Week 28 · Jul 6–12"):');

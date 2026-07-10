@@ -1,6 +1,7 @@
 'use client';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { api, fmtTime } from '../../../lib/api';
+import { useLiveData } from '../../../lib/useLiveData';
 
 export default function Roster() {
   const [shifts, setShifts] = useState<any[]>([]);
@@ -15,7 +16,7 @@ export default function Roster() {
     api<{ workers: any[] }>('/v1/admin/workers?status=ACTIVE').then(r => setWorkers(r.workers)),
     api<{ cities: any[] }>('/v1/admin/cities').then(r => setCities(r.cities)),
   ]);
-  useEffect(() => { load(); }, []);
+  useLiveData(load);
 
   const hubs = cities.flatMap(c => c.hubs);
 

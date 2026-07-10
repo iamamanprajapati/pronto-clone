@@ -1,6 +1,7 @@
 'use client';
 import { useEffect, useState } from 'react';
 import { api, fmtTime } from '../../lib/api';
+import { useLiveData } from '../../lib/useLiveData';
 
 export default function Support() {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -9,7 +10,9 @@ export default function Support() {
   const [reply, setReply] = useState('');
 
   const load = () => api<{ tickets: any[] }>(`/v1/support/admin/tickets?status=${status}`).then(r => setTickets(r.tickets));
-  useEffect(() => { load(); }, [status]);
+  useLiveData(load);
+  useEffect(() => { load(); /* immediate reload when the filter changes */ // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [status]);
 
   async function send(id: string, newStatus?: string) {
     if (!reply && !newStatus) return;
