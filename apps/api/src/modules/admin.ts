@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
+import { isTerminal, type BookingStatus } from '@pronto/shared';
 import { db } from '../db';
 import { requireAdmin } from '../middleware/auth';
 import { h, HttpError } from '../middleware/errors';
@@ -69,10 +70,19 @@ adminRouter.post('/ops/bookings/:id/cancel', requireAdmin('CITY_OPS'), h(async (
   const { reason } = z.object({ reason: z.string().min(3) }).parse(req.body);
   const b = await db.booking.findUnique({ where: { id: req.params.id } });
   if (!b) throw new HttpError(404, 'Booking not found');
+  if (isTerminal(b.status as BookingStatus)) {
+    throw new HttpError(409, `Booking is already ${b.status.toLowerCase().replace(/_/g, ' ')}`);
+  }
   if (b.workerId) await releaseWorker(b.workerId);
   await transition(b.id, 'CANCELLED_ADMIN', { kind: 'admin', id: req.auth!.sub }, { reason });
-  await audit(req.auth!.sub, 'cancel', 'booking', b.id, { status: b.status }, { reason });
-  res.json({ ok: true });
+
+  // Admin-initiated cancel = full refund of anything the customer paid.
+  const paid = await db.payment.findFirst({ where: { bookingId: b.id, status: 'PAID', purpose: 'booking' } });
+  if (paid && paid.refundPaise < paid.amountPaise) {
+    await db.payment.update({ where: { id: paid.id }, data: { refundPaise: paid.amountPaise, status: 'REFUNDED' } });
+  }
+  await audit(req.auth!.sub, 'cancel', 'booking', b.id, { status: b.status }, { reason, refunded: paid?.amountPaise ?? 0 });
+  res.json({ ok: true, refundedPaise: paid?.amountPaise ?? 0 });
 }));
 
 // ───────────────────────── Bookings table ─────────────────────────

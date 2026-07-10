@@ -1,4 +1,5 @@
 'use client';
+import { useEffect, useState } from 'react';
 import { usePathname } from 'next/navigation';
 import Link from 'next/link';
 import {
@@ -19,8 +20,11 @@ const NAV: Array<{ group: string; items: Array<[string, string, LucideIcon]> }> 
 
 export function Sidebar() {
   const path = usePathname();
+  // Read localStorage only after mount — reading it during render makes the
+  // server (null) and client (value) markup differ, which is a hydration error.
+  const [me, setMe] = useState<ReturnType<typeof admin>>(null);
+  useEffect(() => { setMe(admin()); }, []);
   if (path === '/login') return null;
-  const me = admin();
   return (
     <nav className="sidebar">
       <div className="logo" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>

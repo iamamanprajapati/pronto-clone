@@ -32,6 +32,7 @@ export function LiveMap({ workers, center }: { workers: MapWorker[]; center: [nu
       center: [center[1], center[0]],
       zoom: 13,
     });
+    return () => { map.current?.remove(); map.current = null; };
   }, [center]);
 
   useEffect(() => {
