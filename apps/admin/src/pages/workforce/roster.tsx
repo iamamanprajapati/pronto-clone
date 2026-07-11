@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, fmtTime } from '../../lib/api';
 import { useLiveData } from '../../lib/useLiveData';
 import { useModals } from '../../lib/ModalContext';
+import { Button } from '../../components/Button';
 
 export default function Roster() {
   const { alert: modalAlert } = useModals();
@@ -58,7 +59,7 @@ export default function Roster() {
         <input type="date" style={{ width: 150 }} value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} />
         <input type="time" style={{ width: 110 }} value={form.from} onChange={e => setForm({ ...form, from: e.target.value })} />
         <input type="time" style={{ width: 110 }} value={form.to} onChange={e => setForm({ ...form, to: e.target.value })} />
-        <button onClick={addShift}>Add shift</button>
+        <Button onClick={addShift}>Add shift</Button>
       </div>
 
       <h2>Upcoming shifts</h2>
@@ -83,8 +84,8 @@ export default function Roster() {
               <tr key={l.id}>
                 <td>{l.worker.user.name}</td><td>{fmtTime(l.fromDate)}</td><td>{fmtTime(l.toDate)}</td><td>{l.reason}</td>
                 <td><div className="row" style={{ marginBottom: 0 }}>
-                  <button onClick={() => decide(l.id, true)}>Approve</button>
-                  <button className="danger" onClick={() => decide(l.id, false)}>Reject</button>
+                  <Button onClick={() => decide(l.id, true)}>Approve</Button>
+                  <Button className="danger" onClick={() => decide(l.id, false)}>Reject</Button>
                 </div></td>
               </tr>
             ))}

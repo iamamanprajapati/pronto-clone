@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { api, rupees, fmtTime } from '../lib/api';
 import { useModals } from '../lib/ModalContext';
+import { Button } from '../components/Button';
 
 export default function BookingDetail() {
   const { id } = useParams<{ id: string }>();
@@ -38,7 +39,7 @@ export default function BookingDetail() {
             <div><b>Address:</b> {b.address.flat}, {b.address.landmark} · {b.zone.name}</div>
             <div><b>Instructions:</b> {b.instructions ?? '—'}</div>
             <div><b>Bill:</b> base {rupees(b.basePaise)} + ext {rupees(b.extensionPaise)} − disc {rupees(b.discountPaise)} + tip {rupees(b.tipPaise)} = <b>{rupees(b.totalPaise)}</b></div>
-            <div className="row"><button className="ghost" onClick={refund}>Issue refund</button></div>
+            <div className="row"><Button className="ghost" onClick={refund}>Issue refund</Button></div>
           </div>
 
           <h2>Timeline (audit)</h2>

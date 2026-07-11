@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { api, fmtTime } from '../lib/api';
 import { useLiveData } from '../lib/useLiveData';
+import { Button } from '../components/Button';
 
 export default function Support() {
   const [tickets, setTickets] = useState<any[]>([]);
@@ -31,7 +32,7 @@ export default function Support() {
       <h1>Support Console</h1>
       <div className="row">
         {['OPEN', 'IN_PROGRESS', 'RESOLVED', 'ALL'].map(s => (
-          <button key={s} className={status === s ? '' : 'ghost'} onClick={() => setStatus(s)}>{s}</button>
+          <Button key={s} className={status === s ? '' : 'ghost'} onClick={() => setStatus(s)}>{s}</Button>
         ))}
       </div>
       {tickets.map(t => (
@@ -41,9 +42,9 @@ export default function Support() {
             <span className={`badge ${t.status}`}>{t.status}</span>
           </div>
           <div className="muted">{t.user.role} · {t.user.name ?? t.user.phone} {t.bookingId && `· booking ${t.bookingId.slice(-6)}`} · {fmtTime(t.createdAt)}</div>
-          <button className="ghost" style={{ marginTop: 8 }} onClick={() => setOpen(open === t.id ? null : t.id)}>
+          <Button className="ghost" style={{ marginTop: 8 }} onClick={() => setOpen(open === t.id ? null : t.id)}>
             {open === t.id ? 'Hide' : `Thread (${t.messages.length})`}
-          </button>
+          </Button>
           {open === t.id && (
             <div className="stack" style={{ marginTop: 10 }}>
               {t.messages.map((m: any) => (
@@ -51,8 +52,8 @@ export default function Support() {
               ))}
               <textarea rows={2} placeholder="Reply…" value={reply} onChange={e => setReply(e.target.value)} />
               <div className="row" style={{ marginBottom: 0 }}>
-                <button onClick={() => send(t.id)}>Reply</button>
-                <button className="ghost" onClick={() => send(t.id, 'RESOLVED')}>Resolve</button>
+                <Button onClick={() => send(t.id)}>Reply</Button>
+                <Button className="ghost" onClick={() => send(t.id, 'RESOLVED')}>Resolve</Button>
               </div>
             </div>
           )}

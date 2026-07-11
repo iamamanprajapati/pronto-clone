@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, rupees, fmtTime } from '../../lib/api';
 import { useModals } from '../../lib/ModalContext';
+import { Button } from '../../components/Button';
 
 export default function Worker360() {
   const { id } = useParams<{ id: string }>();
@@ -45,10 +46,10 @@ export default function Worker360() {
     <div>
       <h1>{w.user.name ?? w.user.phone} <span className={`badge ${w.status}`}>{w.status}</span> <span className={`badge ${w.duty}`}>{w.duty}</span></h1>
       <div className="row">
-        {w.status !== 'ACTIVE' && <button onClick={() => setStatus('ACTIVE')}>Activate</button>}
-        {w.status === 'ACTIVE' && <button className="danger" onClick={() => setStatus('SUSPENDED')}>Suspend</button>}
-        {w.status === 'SUSPENDED' && <button className="danger" onClick={() => setStatus('TERMINATED')}>Terminate</button>}
-        <button className="ghost" onClick={() => setStatus('TRAINING')}>Force retraining</button>
+        {w.status !== 'ACTIVE' && <Button onClick={() => setStatus('ACTIVE')}>Activate</Button>}
+        {w.status === 'ACTIVE' && <Button className="danger" onClick={() => setStatus('SUSPENDED')}>Suspend</Button>}
+        {w.status === 'SUSPENDED' && <Button className="danger" onClick={() => setStatus('TERMINATED')}>Terminate</Button>}
+        <Button className="ghost" onClick={() => setStatus('TRAINING')}>Force retraining</Button>
         <select
           style={{ width: 220 }}
           value={w.hubId ?? ''}
@@ -81,8 +82,8 @@ export default function Worker360() {
                     <td>
                       {d.status === 'SUBMITTED' && (
                         <div className="row" style={{ marginBottom: 0 }}>
-                          <button onClick={() => kyc(d.id, true)}>Approve</button>
-                          <button className="danger" onClick={() => kyc(d.id, false)}>Reject</button>
+                          <Button onClick={() => kyc(d.id, true)}>Approve</Button>
+                          <Button className="danger" onClick={() => kyc(d.id, false)}>Reject</Button>
                         </div>
                       )}
                     </td>

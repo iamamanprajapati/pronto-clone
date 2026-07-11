@@ -4,6 +4,7 @@ import { io, type Socket } from 'socket.io-client';
 import { api, API, token, rupees, fmtTime } from '../lib/api';
 import { LiveMap, type MapWorker } from '../components/LiveMap';
 import { useModals } from '../lib/ModalContext';
+import { Button } from '../components/Button';
 
 interface Overview {
   activeBookings: number; idleWorkers: number; openSos: number; unassignedLastHour: number;
@@ -110,8 +111,8 @@ export default function LiveOps() {
                     <td className="muted">{fmtTime(b.createdAt)}</td>
                     <td onClick={e => e.stopPropagation()}>
                       <div className="row" style={{ marginBottom: 0 }}>
-                        <button className="ghost" onClick={() => reassign(b.id)}>Reassign</button>
-                        <button className="danger" onClick={() => cancel(b.id)}>Cancel</button>
+                        <Button className="ghost" onClick={() => reassign(b.id)}>Reassign</Button>
+                        <Button className="danger" onClick={() => cancel(b.id)}>Cancel</Button>
                       </div>
                     </td>
                   </tr>
@@ -129,7 +130,7 @@ export default function LiveOps() {
             <div key={i} className="alertItem">
               <b>SOS · {a.raisedBy}</b> {a.workerName && <span>— {a.workerName}</span>}
               <div className="muted">{a.bookingId ? `booking ${a.bookingId.slice(-6)}` : 'no booking'} · {fmtTime(a.at)}</div>
-              <button className="btn" style={{ display: 'inline-block', marginTop: 6 }} onClick={() => navigate('/sos')}>Open SOS console</button>
+              <Button className="btn" style={{ display: 'inline-block', marginTop: 6 }} onClick={() => navigate('/sos')}>Open SOS console</Button>
             </div>
           ))}
         </div>

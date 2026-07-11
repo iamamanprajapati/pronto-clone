@@ -2,15 +2,18 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Zap } from 'lucide-react';
 import { api } from '../lib/api';
+import { Button } from '../components/Button';
 
 export default function Login() {
   const navigate = useNavigate();
   const [email, setEmail] = useState('admin@pronto.local');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
+    setLoading(true);
     try {
       const r = await api<{ token: string; admin: unknown }>('/v1/auth/admin/login', {
         method: 'POST', body: JSON.stringify({ email, password }),
@@ -20,6 +23,8 @@ export default function Login() {
       navigate('/');
     } catch (err) {
       setError((err as Error).message);
+    } finally {
+      setLoading(false);
     }
   }
 
@@ -29,7 +34,7 @@ export default function Login() {
       <input placeholder="Email" value={email} onChange={e => setEmail(e.target.value)} />
       <input placeholder="Password" type="password" value={password} onChange={e => setPassword(e.target.value)} />
       {error && <div style={{ color: 'var(--red)' }}>{error}</div>}
-      <button style={{ width: '100%' }}>Sign in</button>
+      <Button style={{ width: '100%' }} loading={loading}>Sign in</Button>
       <div className="muted">Seeded: admin@pronto.local / admin123</div>
     </form>
   );

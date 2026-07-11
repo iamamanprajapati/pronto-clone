@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, fmtTime } from '../lib/api';
 import { useLiveData } from '../lib/useLiveData';
 import { useModals } from '../lib/ModalContext';
+import { Button } from '../components/Button';
 
 export default function Platform() {
   const { prompt: modalPrompt, confirm: modalConfirm, alert: modalAlert } = useModals();
@@ -48,20 +49,20 @@ export default function Platform() {
   return (
     <div>
       <h1>Platform</h1>
-      <div className="row"><button onClick={announce}>Send announcement</button></div>
+      <div className="row"><Button onClick={announce}>Send announcement</Button></div>
 
       <h2>Feature flags</h2>
       <div className="tableWrap"><table><tbody>
         {flags.map(f => (
           <tr key={f.key}>
             <td><b>{f.key}</b></td><td>{JSON.stringify(f.value)}</td>
-            <td><button className="ghost" onClick={() => editFlag(f)}>Edit</button></td>
+            <td><Button className="ghost" onClick={() => editFlag(f)}>Edit</Button></td>
           </tr>
         ))}
       </tbody></table></div>
 
       <h2>Admin users (RBAC)</h2>
-      <div className="row"><button onClick={addAdmin}>Add admin</button></div>
+      <div className="row"><Button onClick={addAdmin}>Add admin</Button></div>
       <div className="tableWrap"><table>
         <thead><tr><th>Email</th><th>Name</th><th>Role</th><th>Active</th></tr></thead>
         <tbody>

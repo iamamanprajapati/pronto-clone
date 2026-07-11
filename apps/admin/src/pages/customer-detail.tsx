@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { api, rupees, fmtTime } from '../lib/api';
 import { useModals } from '../lib/ModalContext';
+import { Button } from '../components/Button';
 
 export default function Customer360() {
   const { id } = useParams<{ id: string }>();
@@ -35,9 +36,9 @@ export default function Customer360() {
         <div className="card"><div className="label">Credits</div><div className="value">{rupees(c.creditsPaise)}</div></div>
       </div>
       <div className="row">
-        <button className="ghost" onClick={credit}>Issue credit</button>
-        <button className={c.banned ? 'ghost' : 'danger'} onClick={() => flag({ banned: !c.banned })}>{c.banned ? 'Unban' : 'Ban'}</button>
-        <button className="ghost" onClick={() => flag({ fraudFlag: !c.fraudFlag })}>{c.fraudFlag ? 'Clear fraud flag' : 'Flag fraud'}</button>
+        <Button className="ghost" onClick={credit}>Issue credit</Button>
+        <Button className={c.banned ? 'ghost' : 'danger'} onClick={() => flag({ banned: !c.banned })}>{c.banned ? 'Unban' : 'Ban'}</Button>
+        <Button className="ghost" onClick={() => flag({ fraudFlag: !c.fraudFlag })}>{c.fraudFlag ? 'Clear fraud flag' : 'Flag fraud'}</Button>
       </div>
       <h2>Bookings</h2>
       <div className="tableWrap">

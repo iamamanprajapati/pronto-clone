@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api, fmtTime } from '../lib/api';
 import { useLiveData } from '../lib/useLiveData';
 import { useModals } from '../lib/ModalContext';
+import { Button } from '../components/Button';
 
 export default function SosConsole() {
   const { prompt: modalPrompt, alert: modalAlert } = useModals();
@@ -34,7 +35,7 @@ export default function SosConsole() {
       <h1>SOS Console</h1>
       <div className="row">
         {['OPEN', 'ACKNOWLEDGED', 'RESOLVED', 'ALL'].map(s => (
-          <button key={s} className={filter === s ? '' : 'ghost'} onClick={() => setFilter(s)}>{s}</button>
+          <Button key={s} className={filter === s ? '' : 'ghost'} onClick={() => setFilter(s)}>{s}</Button>
         ))}
       </div>
       <div className="tableWrap">
@@ -51,8 +52,8 @@ export default function SosConsole() {
                 <td className="muted">{e.resolution ?? ''}</td>
                 <td>
                   <div className="row" style={{ marginBottom: 0 }}>
-                    {e.status === 'OPEN' && <button onClick={() => ack(e.id)}>Acknowledge</button>}
-                    {e.status !== 'RESOLVED' && <button className="ghost" onClick={() => resolve(e.id)}>Resolve</button>}
+                    {e.status === 'OPEN' && <Button onClick={() => ack(e.id)}>Acknowledge</Button>}
+                    {e.status !== 'RESOLVED' && <Button className="ghost" onClick={() => resolve(e.id)}>Resolve</Button>}
                   </div>
                 </td>
               </tr>

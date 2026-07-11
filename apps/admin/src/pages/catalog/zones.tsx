@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api } from '../../lib/api';
 import { useLiveData } from '../../lib/useLiveData';
 import { useModals } from '../../lib/ModalContext';
+import { Button } from '../../components/Button';
 
 export default function Zones() {
   const { prompt: modalPrompt, alert: modalAlert } = useModals();
@@ -44,7 +45,7 @@ export default function Zones() {
         <div key={c.id} className="card" style={{ marginBottom: 14 }}>
           <div className="row" style={{ justifyContent: 'space-between' }}>
             <h2 style={{ margin: 0 }}>{c.name}</h2>
-            <button onClick={() => addZone(c.id)}>Add zone</button>
+            <Button onClick={() => addZone(c.id)}>Add zone</Button>
           </div>
           <div className="tableWrap" style={{ marginTop: 10 }}>
             <table>
@@ -56,8 +57,8 @@ export default function Zones() {
                     <td>{c.hubs.filter((h: any) => h.zoneId === z.id).map((h: any) => h.name).join(', ') || '—'}</td>
                     <td><span className={`badge ${z.active ? 'ACTIVE' : 'SUSPENDED'}`}>{z.active ? 'LIVE' : 'OFF'}</span></td>
                     <td><div className="row" style={{ marginBottom: 0 }}>
-                      <button className="ghost" onClick={() => addHub(c.id, z.id)}>Add hub</button>
-                      <button className="ghost" onClick={() => toggleZone(z)}>{z.active ? 'Disable' : 'Enable'}</button>
+                      <Button className="ghost" onClick={() => addHub(c.id, z.id)}>Add hub</Button>
+                      <Button className="ghost" onClick={() => toggleZone(z)}>{z.active ? 'Disable' : 'Enable'}</Button>
                     </div></td>
                   </tr>
                 ))}

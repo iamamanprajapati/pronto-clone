@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, rupees } from '../../lib/api';
 import { useLiveData } from '../../lib/useLiveData';
 import { useModals } from '../../lib/ModalContext';
+import { Button } from '../../components/Button';
 
 export default function Coupons() {
   const { prompt: modalPrompt, confirm: modalConfirm, alert: modalAlert } = useModals();
@@ -29,7 +30,7 @@ export default function Coupons() {
   return (
     <div>
       <h1>Coupons</h1>
-      <div className="row"><button onClick={add}>Create coupon</button></div>
+      <div className="row"><Button onClick={add}>Create coupon</Button></div>
       <div className="tableWrap">
         <table>
           <thead><tr><th>Code</th><th>Description</th><th>Discount</th><th>Used</th><th>First-only</th><th>Active</th></tr></thead>
@@ -40,7 +41,7 @@ export default function Coupons() {
                 <td>{c.discountPct ? `${c.discountPct}%` : rupees(c.discountPaise)} (max {rupees(c.maxDiscountPaise)})</td>
                 <td>{c.usedCount}{c.usageLimit ? `/${c.usageLimit}` : ''}</td>
                 <td>{c.firstBookingOnly ? '✓' : ''}</td>
-                <td><button className="ghost" onClick={() => toggle(c)}>{c.active ? 'Disable' : 'Enable'}</button></td>
+                <td><Button className="ghost" onClick={() => toggle(c)}>{c.active ? 'Disable' : 'Enable'}</Button></td>
               </tr>
             ))}
           </tbody>

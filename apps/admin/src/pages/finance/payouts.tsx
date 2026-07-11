@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { api, rupees, fmtTime } from '../../lib/api';
 import { useLiveData } from '../../lib/useLiveData';
 import { useModals } from '../../lib/ModalContext';
+import { Button } from '../../components/Button';
 
 export default function Payouts() {
   const { prompt: modalPrompt, alert: modalAlert } = useModals();
@@ -29,7 +30,7 @@ export default function Payouts() {
   return (
     <div>
       <h1>Payout Runs</h1>
-      <div className="row"><button onClick={createRun}>Create run from unpaid earnings</button></div>
+      <div className="row"><Button onClick={createRun}>Create run from unpaid earnings</Button></div>
       <div className="muted" style={{ marginBottom: 10 }}>
         Maker-checker: the admin who creates a run cannot approve it. Disburse triggers the payout rail (RazorpayX in production).
       </div>
@@ -45,8 +46,8 @@ export default function Payouts() {
                 <td>{r._count.earnings}</td>
                 <td className="muted">{fmtTime(r.createdAt)}</td>
                 <td><div className="row" style={{ marginBottom: 0 }}>
-                  {r.status === 'DRAFT' && <button onClick={() => act(r.id, 'approve')}>Approve</button>}
-                  {r.status === 'APPROVED' && <button onClick={() => act(r.id, 'disburse')}>Disburse</button>}
+                  {r.status === 'DRAFT' && <Button onClick={() => act(r.id, 'approve')}>Approve</Button>}
+                  {r.status === 'APPROVED' && <Button onClick={() => act(r.id, 'disburse')}>Disburse</Button>}
                 </div></td>
               </tr>
             ))}

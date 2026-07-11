@@ -3,6 +3,7 @@ import { api, rupees } from '../../lib/api';
 import { useLiveData } from '../../lib/useLiveData';
 import { ServiceIcon } from '../../components/ServiceIcon';
 import { useModals } from '../../lib/ModalContext';
+import { Button } from '../../components/Button';
 
 export default function Services() {
   const { prompt: modalPrompt, alert: modalAlert } = useModals();
@@ -54,7 +55,7 @@ export default function Services() {
   return (
     <div>
       <h1>Services & Pricing</h1>
-      <div className="row"><button onClick={addService}>Add service</button></div>
+      <div className="row"><Button onClick={addService}>Add service</Button></div>
       <div className="split">
         <div className="tableWrap">
           <table>
@@ -63,7 +64,7 @@ export default function Services() {
               {services.map(s => (
                 <tr key={s.id}>
                   <td><ServiceIcon icon={s.icon} /> {s.name}</td><td>{s.category}</td><td>{s.baseMinutes}</td>
-                  <td><button className="ghost" onClick={() => toggle(s)}>{s.active !== false ? 'Disable' : 'Enable'}</button></td>
+                  <td><Button className="ghost" onClick={() => toggle(s)}>{s.active !== false ? 'Disable' : 'Enable'}</Button></td>
                 </tr>
               ))}
             </tbody>
@@ -80,7 +81,7 @@ export default function Services() {
                 {pricing.map(p => (
                   <tr key={p.id}>
                     <td>{p.durationMin} min</td><td>{rupees(p.pricePaise)}</td><td>×{p.surgeMultiplier}</td>
-                    <td><button className="ghost" onClick={() => editPrice(p)}>Edit</button></td>
+                    <td><Button className="ghost" onClick={() => editPrice(p)}>Edit</Button></td>
                   </tr>
                 ))}
               </tbody>
