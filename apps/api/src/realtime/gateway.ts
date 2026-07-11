@@ -22,7 +22,22 @@ export function initGateway(http: HttpServer): Server {
 
     socket.on('subscribe', async (channel: string, ack?: (ok: boolean) => void) => {
       const allowed = await canJoin(claims, channel);
-      if (allowed) socket.join(channel);
+      if (allowed) {
+        socket.join(channel);
+        try {
+          const parts = channel.split(':');
+          if (parts[0] === 'admin' && parts[2] === 'firehose') {
+            const cityId = parts[1];
+            const { pushSnapshotForZone } = await import('../modules/location');
+            const zones = await db.zone.findMany({ where: { cityId, active: true } });
+            for (const zone of zones) {
+              await pushSnapshotForZone(zone.id);
+            }
+          }
+        } catch (err) {
+          console.error('Initial snapshot push error:', err);
+        }
+      }
       ack?.(allowed);
     });
 

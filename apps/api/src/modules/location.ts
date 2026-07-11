@@ -116,52 +116,58 @@ async function ensureDemoExperts(zoneId: string) {
   }
 }
 
+/** Push live snapshot for a specific zone to connected clients. */
+export async function pushSnapshotForZone(zoneId: string) {
+  const zone = await db.zone.findUnique({ where: { id: zoneId } });
+  if (!zone || !zone.active) return;
+  await ensureDemoExperts(zone.id);
+  const members = await redis.zrange(geoKey(zone.id), 0, -1);
+
+  const workers: ZoneSnapshot['workers'] = [];
+  const adminWorkers: ZoneSnapshot['workers'] = [];
+  const counts = { idle: 0, enRoute: 0, onJob: 0 };
+
+  for (const member of members) {
+    const workerId = member.replace('worker:', '');
+    const live = await redis.hgetall(liveKey(workerId));
+    if (!live.lat) {
+      await redis.zrem(geoKey(zone.id), member); // liveness expired → drop from geo
+      continue;
+    }
+    const duty = (live.duty ?? 'IDLE') as ZoneSnapshot['workers'][number]['duty'];
+    if (duty === 'IDLE') counts.idle++;
+    else if (duty === 'EN_ROUTE') counts.enRoute++;
+    else if (duty === 'ON_JOB') counts.onJob++;
+
+    const worker = await db.worker.findUnique({ where: { id: workerId }, include: { user: true } });
+    const skills = worker?.skills ?? [];
+    // customer variant: anonymized, idle workers only
+    if (duty === 'IDLE') {
+      workers.push({ lat: snap(Number(live.lat)), lng: snap(Number(live.lng)), duty, skills });
+    }
+    // admin variant: everyone, exact
+    adminWorkers.push({
+      workerId, name: worker?.user.name ?? 'Expert',
+      lat: Number(live.lat), lng: Number(live.lng), duty, skills,
+    });
+  }
+
+  const base = { zoneId: zone.id, counts, at: new Date().toISOString() };
+  emitTo(channels.zoneWorkers(zone.id), EV.ZONE_SNAPSHOT, {
+    ...base, workers, bestEtaMin: counts.idle > 0 ? 8 : null,
+  } satisfies ZoneSnapshot);
+  emitTo(channels.adminFirehose(zone.cityId), EV.ZONE_SNAPSHOT, {
+    ...base, workers: adminWorkers, bestEtaMin: null,
+  } satisfies ZoneSnapshot);
+}
+
 /** Build + publish snapshots for every active zone. Started from index.ts. */
 export function startSnapshotLoop() {
   setInterval(async () => {
     try {
       const zones = await db.zone.findMany({ where: { active: true } });
       for (const zone of zones) {
-        await ensureDemoExperts(zone.id);
-        const members = await redis.zrange(geoKey(zone.id), 0, -1);
-        if (members.length === 0) continue;
-
-        const workers: ZoneSnapshot['workers'] = [];
-        const adminWorkers: ZoneSnapshot['workers'] = [];
-        const counts = { idle: 0, enRoute: 0, onJob: 0 };
-
-        for (const member of members) {
-          const workerId = member.replace('worker:', '');
-          const live = await redis.hgetall(liveKey(workerId));
-          if (!live.lat) {
-            await redis.zrem(geoKey(zone.id), member); // liveness expired → drop from geo
-            continue;
-          }
-          const duty = (live.duty ?? 'IDLE') as ZoneSnapshot['workers'][number]['duty'];
-          if (duty === 'IDLE') counts.idle++;
-          else if (duty === 'EN_ROUTE') counts.enRoute++;
-          else if (duty === 'ON_JOB') counts.onJob++;
-
-          const worker = await db.worker.findUnique({ where: { id: workerId }, include: { user: true } });
-          const skills = worker?.skills ?? [];
-          // customer variant: anonymized, idle workers only
-          if (duty === 'IDLE') {
-            workers.push({ lat: snap(Number(live.lat)), lng: snap(Number(live.lng)), duty, skills });
-          }
-          // admin variant: everyone, exact
-          adminWorkers.push({
-            workerId, name: worker?.user.name ?? 'Expert',
-            lat: Number(live.lat), lng: Number(live.lng), duty, skills,
-          });
-        }
-
-        const base = { zoneId: zone.id, counts, at: new Date().toISOString() };
-        emitTo(channels.zoneWorkers(zone.id), EV.ZONE_SNAPSHOT, {
-          ...base, workers, bestEtaMin: counts.idle > 0 ? 8 : null,
-        } satisfies ZoneSnapshot);
-        emitTo(channels.adminFirehose(zone.cityId), EV.ZONE_SNAPSHOT, {
-          ...base, workers: adminWorkers, bestEtaMin: null,
-        } satisfies ZoneSnapshot);
+        await pushSnapshotForZone(zone.id);
       }
     } catch (err) {
       console.error('snapshot loop error', err);

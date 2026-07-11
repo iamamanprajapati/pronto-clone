@@ -1,12 +1,14 @@
 import { Router } from 'express';
 import { createHash } from 'node:crypto';
 import { z } from 'zod';
-import { isTerminal, type BookingStatus } from '@pronto/shared';
+import { isTerminal, type BookingStatus, WORKER_LIVENESS_TTL_S } from '@pronto/shared';
 import { db } from '../db';
 import { requireAdmin } from '../middleware/auth';
 import { h, HttpError } from '../middleware/errors';
 import { transition } from './bookingService';
 import { dispatchBooking, releaseWorker } from './dispatch';
+import { geoKey, liveKey, redis } from '../redis';
+import { pushSnapshotForZone } from './location';
 
 export const adminRouter = Router();
 const sha = (s: string) => createHash('sha256').update(s).digest('hex');
@@ -192,6 +194,44 @@ adminRouter.post('/workers/:id/status', requireAdmin('CITY_OPS'), h(async (req, 
     data: { ...(status ? { status, duty: status === 'ACTIVE' ? before.duty : 'OFF_DUTY' } : {}), ...(hubId ? { hubId } : {}) },
   });
   await audit(req.auth!.sub, 'worker-status', 'worker', worker.id, { status: before.status }, { status: worker.status, hubId });
+
+  // Update live Redis location index immediately on status/hub mutation
+  try {
+    if (worker.status !== 'ACTIVE' && before.hubId) {
+      const oldHub = await db.hub.findUnique({ where: { id: before.hubId } });
+      if (oldHub?.zoneId) {
+        await redis.zrem(geoKey(oldHub.zoneId), `worker:${worker.id}`);
+        await redis.del(liveKey(worker.id));
+        await pushSnapshotForZone(oldHub.zoneId);
+      }
+    } else if (hubId && worker.status === 'ACTIVE') {
+      const hub = await db.hub.findUnique({ where: { id: hubId } });
+      if (hub && hub.zoneId) {
+        // Remove from old hub zone
+        if (before.hubId) {
+          const oldHub = await db.hub.findUnique({ where: { id: before.hubId } });
+          if (oldHub?.zoneId) {
+            await redis.zrem(geoKey(oldHub.zoneId), `worker:${worker.id}`);
+            await pushSnapshotForZone(oldHub.zoneId);
+          }
+        }
+        // Add to new hub zone
+        await redis.geoadd(geoKey(hub.zoneId), hub.lng, hub.lat, `worker:${worker.id}`);
+        await redis.hset(liveKey(worker.id), {
+          lat: hub.lat,
+          lng: hub.lng,
+          duty: worker.duty,
+          zoneId: hub.zoneId,
+          lastPing: Date.now(),
+        });
+        await redis.expire(liveKey(worker.id), WORKER_LIVENESS_TTL_S);
+        await pushSnapshotForZone(hub.zoneId);
+      }
+    }
+  } catch (err) {
+    console.error('Failed to sync worker location to Redis:', err);
+  }
+
   res.json({ worker });
 }));
 
