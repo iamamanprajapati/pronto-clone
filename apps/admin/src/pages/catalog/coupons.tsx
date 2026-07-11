@@ -24,8 +24,10 @@ export default function Coupons() {
     }).then(load).catch(async e => await modalAlert(e.message));
   }
 
-  const toggle = (c: any) =>
-    api(`/v1/admin/coupons/${c.id}`, { method: 'PATCH', body: JSON.stringify({ active: !c.active }) }).then(load);
+  async function toggle(c: any) {
+    await api(`/v1/admin/coupons/${c.id}`, { method: 'PATCH', body: JSON.stringify({ active: !c.active }) });
+    await load();
+  }
 
   return (
     <div>

@@ -13,7 +13,14 @@ export function admin(): { id: string; name: string; role: string; cityId: strin
 }
 
 export async function api<T = unknown>(path: string, opts: RequestInit = {}): Promise<T> {
-  const res = await fetch(`${API}${path}`, {
+  const method = opts.method ?? 'GET';
+  let url = `${API}${path}`;
+  if (method.toUpperCase() === 'GET') {
+    const buster = `_cb=${Date.now()}`;
+    url += (url.includes('?') ? '&' : '?') + buster;
+  }
+
+  const res = await fetch(url, {
     cache: 'no-store', // never serve a stale GET after a mutation
     ...opts,
     headers: {

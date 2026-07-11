@@ -35,8 +35,10 @@ export default function Zones() {
     await api('/v1/admin/hubs', { method: 'POST', body: JSON.stringify({ cityId, zoneId, name, lat, lng }) }).then(load);
   }
 
-  const toggleZone = (z: any) =>
-    api(`/v1/admin/zones/${z.id}`, { method: 'PATCH', body: JSON.stringify({ active: !z.active }) }).then(load);
+  async function toggleZone(z: any) {
+    await api(`/v1/admin/zones/${z.id}`, { method: 'PATCH', body: JSON.stringify({ active: !z.active }) });
+    await load();
+  }
 
   return (
     <div>

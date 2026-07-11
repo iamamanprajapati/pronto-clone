@@ -22,10 +22,14 @@ export default function Payouts() {
       .catch(async e => await modalAlert(e.message));
   }
 
-  const act = (id: string, action: string) =>
-    api(`/v1/earnings/payout-runs/${id}/${action}`, { method: 'POST' })
-      .then(load)
-      .catch(async e => await modalAlert(e.message));
+  async function act(id: string, action: string) {
+    try {
+      await api(`/v1/earnings/payout-runs/${id}/${action}`, { method: 'POST' });
+      await load();
+    } catch (e) {
+      await modalAlert((e as Error).message);
+    }
+  }
 
   return (
     <div>

@@ -359,7 +359,13 @@ adminRouter.put('/pricing', requireAdmin('SUPER_ADMIN', 'CITY_OPS'), h(async (re
 }));
 
 adminRouter.get('/cities', requireAdmin(), h(async (_req, res) => {
-  const cities = await db.city.findMany({ include: { zones: true, hubs: true } });
+  const cities = await db.city.findMany({
+    include: {
+      zones: { orderBy: { name: 'asc' } },
+      hubs: { orderBy: { name: 'asc' } },
+    },
+    orderBy: { name: 'asc' },
+  });
   res.json({ cities });
 }));
 
