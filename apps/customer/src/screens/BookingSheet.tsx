@@ -7,8 +7,8 @@ import { Btn, C, Card, IconCircle, Muted } from '../ui';
 import { MCI, ServiceIcon } from '../icons';
 
 /** The 3-step booking flow: Tasks → Duration & slot → Review, as a sheet over Home. */
-export default function BookingSheet({ visible, onClose, navigation }: {
-  visible: boolean; onClose: () => void; navigation: any;
+export default function BookingSheet({ visible, onClose, navigation, soldOut = false }: {
+  visible: boolean; onClose: () => void; navigation: any; soldOut?: boolean;
 }) {
   const { services, zone, selectedAddress, draftTasks, toggleTask, draftDuration, setDraftDuration,
     draftScheduledAt, setDraftScheduledAt, clearDraft, setActiveBookingId } = useStore();
@@ -106,11 +106,13 @@ export default function BookingSheet({ visible, onClose, navigation }: {
                 ))}
               </View>
               <Text style={{ fontWeight: '700', color: C.text, marginBottom: 8 }}>When?</Text>
-              <Pressable onPress={() => setDraftScheduledAt(null)}
-                style={{ backgroundColor: !draftScheduledAt ? '#FDE9F3' : 'white', borderWidth: 1.5, borderColor: !draftScheduledAt ? C.accent : C.border, borderRadius: 16, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              <Pressable disabled={soldOut} onPress={() => setDraftScheduledAt(null)}
+                style={{ backgroundColor: !draftScheduledAt && !soldOut ? C.tint : 'white', borderWidth: 1.5, borderColor: !draftScheduledAt && !soldOut ? C.accent : C.border, borderRadius: 16, padding: 12, marginBottom: 8, flexDirection: 'row', alignItems: 'center', gap: 8, opacity: soldOut ? 0.45 : 1 }}>
                 <MCI name="flash" size={18} color={C.accent} />
-                <Text style={{ fontWeight: '700', color: C.text }}>Now — expert in ~10 min</Text>
+                <Text style={{ fontWeight: '700', color: C.text, flex: 1 }}>Now — expert in ~10 min</Text>
+                {soldOut && <Text style={{ fontSize: 10, fontWeight: '800', color: C.red, textTransform: 'uppercase' }}>Sold out</Text>}
               </Pressable>
+              {soldOut && <Muted style={{ marginBottom: 8 }}>No experts free right now — pick a time slot below.</Muted>}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {slots.map(d => {
                   const iso = d.toISOString();
@@ -169,7 +171,12 @@ export default function BookingSheet({ visible, onClose, navigation }: {
         <View style={{ flexDirection: 'row', gap: 10, marginTop: 14 }}>
           {step > 0 && <Btn kind="ghost" title="Back" onPress={() => setStep(step - 1)} style={{ flex: 1 }} />}
           {step < 2
-            ? <Btn title="Continue" onPress={() => setStep(step + 1)} disabled={step === 0 && draftTasks.length === 0} style={{ flex: 2 }} />
+            ? <Btn
+                title="Continue"
+                onPress={() => setStep(step + 1)}
+                disabled={(step === 0 && draftTasks.length === 0) || (step === 1 && soldOut && !draftScheduledAt)}
+                style={{ flex: 2 }}
+              />
             : <Btn title={paying ? 'Booking…' : `Slide to book · ${quote ? rupees(quote.totalPaise) : ''}`} onPress={book} disabled={paying || !quote} style={{ flex: 2 }} />}
         </View>
       </View>

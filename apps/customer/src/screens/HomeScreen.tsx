@@ -21,7 +21,12 @@ export default function HomeScreen({ navigation }: any) {
   const [banners, setBanners] = useState<any[]>([]);
   const [sheetOpen, setSheetOpen] = useState(false);
   const [collapsed, setCollapsed] = useState(false);
+  const [live, setLive] = useState(false); // true once the first snapshot arrives
   const mapH = useRef(new Animated.Value(MAP_EXPANDED)).current;
+
+  // Sold out = we have live data and zero idle experts. (Don't flash "sold out"
+  // before the first snapshot lands.)
+  const soldOut = live && counts.idle === 0;
 
   // live worker snapshots for this zone — unsubscribed when sheet is closed/backgrounded
   useEffect(() => {
@@ -31,6 +36,7 @@ export default function HomeScreen({ navigation }: any) {
     subscribe(channel);
     const onSnap = (snap: any) => {
       if (snap.zoneId !== zone.id) return;
+      setLive(true);
       setWorkers(snap.workers);
       setCounts(snap.counts);
       setEta(snap.bestEtaMin);
@@ -84,9 +90,9 @@ export default function HomeScreen({ navigation }: any) {
             onPress={() => setMap(false)}
             style={{ flex: 1, backgroundColor: C.tint, flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, justifyContent: 'space-between' }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <MCI name="flash" size={16} color={C.accent} />
-              <Text style={{ fontWeight: '700', color: C.accent }}>
-                {counts.idle} expert{counts.idle === 1 ? '' : 's'} nearby{eta ? ` · ~${eta} min` : ''}
+              <MCI name="flash" size={16} color={soldOut ? C.red : C.accent} />
+              <Text style={{ fontWeight: '700', color: soldOut ? C.red : C.accent }}>
+                {soldOut ? 'Sold out — no experts nearby' : `${counts.idle} expert${counts.idle === 1 ? '' : 's'} nearby${eta ? ` · ~${eta} min` : ''}`}
               </Text>
             </View>
             <MCI name="chevron-down" size={18} color={C.muted} />
@@ -101,9 +107,9 @@ export default function HomeScreen({ navigation }: any) {
               ]}
             />
             <View style={{ position: 'absolute', top: 10, alignSelf: 'center', backgroundColor: 'white', borderRadius: 20, paddingHorizontal: 14, paddingVertical: 6, elevation: 3, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <MCI name="flash" size={15} color={C.accent} />
-              <Text style={{ fontWeight: '700', color: C.text }}>
-                {counts.idle} expert{counts.idle === 1 ? '' : 's'} near you{eta ? ` · ~${eta} min away` : ''}
+              <MCI name="flash" size={15} color={soldOut ? C.red : C.accent} />
+              <Text style={{ fontWeight: '700', color: soldOut ? C.red : C.text }}>
+                {soldOut ? 'Sold out — no experts near you' : `${counts.idle} expert${counts.idle === 1 ? '' : 's'} near you${eta ? ` · ~${eta} min away` : ''}`}
               </Text>
             </View>
             <Pressable onPress={() => setMap(true)} style={{ position: 'absolute', bottom: 8, alignSelf: 'center', backgroundColor: 'white', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 4 }}>
@@ -128,14 +134,22 @@ export default function HomeScreen({ navigation }: any) {
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {services.map(s => (
             <Pressable key={s.id} onPress={() => setSheetOpen(true)}
-              style={{ width: '30.5%', backgroundColor: 'white', borderRadius: 20, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: C.border }}>
+              style={{ width: '30.5%', backgroundColor: 'white', borderRadius: 20, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: C.border, opacity: soldOut ? 0.45 : 1 }}>
               <IconCircle size={48}><ServiceIcon icon={s.icon} size={24} /></IconCircle>
               <Text style={{ fontSize: 12, fontWeight: '600', color: C.text, textAlign: 'center', marginTop: 8 }}>{s.name}</Text>
+              {soldOut && (
+                <Text style={{ fontSize: 10, fontWeight: '800', color: C.red, marginTop: 4, textTransform: 'uppercase', letterSpacing: 0.5 }}>
+                  Sold out
+                </Text>
+              )}
             </Pressable>
           ))}
         </View>
 
-        <Btn title="Book now — expert in ~10 min" onPress={() => setSheetOpen(true)} />
+        <Btn
+          title={soldOut ? 'Sold out — schedule for later' : 'Book now — expert in ~10 min'}
+          onPress={() => setSheetOpen(true)}
+        />
 
         {banners.map(b => (
           <Card key={b.id} style={{ backgroundColor: C.tint, borderColor: C.tint, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -148,7 +162,7 @@ export default function HomeScreen({ navigation }: any) {
         </Muted>
       </ScrollView>
 
-      <BookingSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} navigation={navigation} />
+      <BookingSheet visible={sheetOpen} onClose={() => setSheetOpen(false)} navigation={navigation} soldOut={soldOut} />
     </View>
   );
 }
