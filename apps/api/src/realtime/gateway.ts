@@ -26,13 +26,16 @@ export function initGateway(http: HttpServer): Server {
         socket.join(channel);
         try {
           const parts = channel.split(':');
+          const { pushSnapshotForZone } = await import('../modules/location');
           if (parts[0] === 'admin' && parts[2] === 'firehose') {
             const cityId = parts[1];
-            const { pushSnapshotForZone } = await import('../modules/location');
             const zones = await db.zone.findMany({ where: { cityId, active: true } });
             for (const zone of zones) {
               await pushSnapshotForZone(zone.id);
             }
+          } else if (parts[0] === 'zone' && parts[2] === 'workers') {
+            // customer map: send current state immediately, don't wait for the loop
+            await pushSnapshotForZone(parts[1]);
           }
         } catch (err) {
           console.error('Initial snapshot push error:', err);

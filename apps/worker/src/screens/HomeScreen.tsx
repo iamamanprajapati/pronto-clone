@@ -19,6 +19,13 @@ export default function HomeScreen({ navigation }: any) {
 
   const onDuty = profile?.duty !== 'OFF_DUTY';
 
+  // Whenever we're on duty, the pinger MUST be running — driven by duty state,
+  // not just the toggle tap, so it survives app reloads/reopens while on duty.
+  useEffect(() => {
+    if (onDuty) startPinger();
+    else stopPinger();
+  }, [onDuty]);
+
   // keep own position fresh for the on-duty map
   useEffect(() => {
     if (!onDuty) { setMyPos(null); return; }

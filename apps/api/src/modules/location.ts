@@ -83,6 +83,11 @@ locationRouter.post('/batch', requireAuth('WORKER'), h(async (req, res) => {
   });
   await redis.expire(liveKey(workerId), WORKER_LIVENESS_TTL_S);
 
+  // real-time: publish the zone snapshot on every ping so worker movement is
+  // live on customer/admin maps (pings are 10–20s apart per worker; at larger
+  // scale, throttle this per-zone instead)
+  if (zoneId) pushSnapshotForZone(zoneId).catch(() => {});
+
   // Exact position → the active booking's channel only
   if (worker.duty === 'EN_ROUTE' || worker.duty === 'ON_JOB') {
     const booking = await db.booking.findFirst({

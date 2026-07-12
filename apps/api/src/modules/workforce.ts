@@ -4,6 +4,7 @@ import { HUB_CHECKIN_GEOFENCE_M, WORKER_LIVENESS_TTL_S } from '@pronto/shared';
 import { db } from '../db';
 import { config } from '../config';
 import { anchorKey, geoKey, redis, type DevAnchor } from '../redis';
+import { pushSnapshotForZone } from './location';
 import { requireAuth } from '../middleware/auth';
 import { h, HttpError } from '../middleware/errors';
 import { distanceM } from '../lib/geo';
@@ -158,6 +159,8 @@ workforceRouter.post('/duty', h(async (req, res) => {
     if (dutyZoneId) await redis.geoadd(geoKey(dutyZoneId), dutyLng, dutyLat, `worker:${w.id}`);
     await redis.hset(`worker:${w.id}:live`, { lat: dutyLat, lng: dutyLng, duty: 'IDLE', idleSince: Date.now(), zoneId: dutyZoneId ?? '' });
     await redis.expire(`worker:${w.id}:live`, WORKER_LIVENESS_TTL_S);
+    // real-time: customers/admin see the worker appear immediately
+    if (dutyZoneId) pushSnapshotForZone(dutyZoneId).catch(() => {});
   } else {
     if (w.duty === 'ON_JOB' || w.duty === 'EN_ROUTE') throw new HttpError(409, 'Finish your active job first');
     const open = await db.attendance.findFirst({
@@ -165,8 +168,15 @@ workforceRouter.post('/duty', h(async (req, res) => {
     });
     if (open) await db.attendance.update({ where: { id: open.id }, data: { checkoutAt: new Date() } });
     await db.worker.update({ where: { id: w.id }, data: { duty: 'OFF_DUTY' } });
+    // remove from whichever zone they were actually registered in (may differ from hub zone in dev)
+    const liveZone = await redis.hget(`worker:${w.id}:live`, 'zoneId');
+    if (liveZone) await redis.zrem(geoKey(liveZone), `worker:${w.id}`);
     if (w.hub?.zoneId) await redis.zrem(geoKey(w.hub.zoneId), `worker:${w.id}`);
     await redis.del(`worker:${w.id}:live`);
+    // real-time: customers/admin see the worker disappear immediately
+    for (const z of new Set([liveZone, w.hub?.zoneId].filter(Boolean) as string[])) {
+      pushSnapshotForZone(z).catch(() => {});
+    }
   }
   res.json({ ok: true, duty: on ? 'IDLE' : 'OFF_DUTY' });
 }));
