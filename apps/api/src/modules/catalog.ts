@@ -16,7 +16,7 @@ export async function zoneForPoint(lat: number, lng: number) {
 }
 
 async function setAnchor(zoneId: string, lat: number, lng: number) {
-  if (config.isDev) await redis.set(anchorKey(zoneId), JSON.stringify({ lat, lng }), 'EX', 3600);
+  if (config.isDev) await redis.set(anchorKey(), JSON.stringify({ lat, lng, zoneId }), 'EX', 3600);
 }
 
 catalogRouter.get('/serviceability', h(async (req, res) => {

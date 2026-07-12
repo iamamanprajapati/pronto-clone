@@ -1,9 +1,9 @@
 import { Router } from 'express';
 import { z } from 'zod';
-import { HUB_CHECKIN_GEOFENCE_M } from '@pronto/shared';
+import { HUB_CHECKIN_GEOFENCE_M, WORKER_LIVENESS_TTL_S } from '@pronto/shared';
 import { db } from '../db';
 import { config } from '../config';
-import { geoKey, redis } from '../redis';
+import { anchorKey, geoKey, redis, type DevAnchor } from '../redis';
 import { requireAuth } from '../middleware/auth';
 import { h, HttpError } from '../middleware/errors';
 import { distanceM } from '../lib/geo';
@@ -142,8 +142,22 @@ workforceRouter.post('/duty', h(async (req, res) => {
       data: { workerId: w.id, shiftId: shift?.id, checkinLat: lat, checkinLng: lng },
     });
     await db.worker.update({ where: { id: w.id }, data: { duty: 'IDLE' } });
-    if (w.hub?.zoneId) await redis.geoadd(geoKey(w.hub.zoneId), lng, lat, `worker:${w.id}`);
-    await redis.hset(`worker:${w.id}:live`, { lat, lng, duty: 'IDLE', idleSince: Date.now(), zoneId: w.hub?.zoneId ?? '' });
+    // Dev: register in the active tester's zone (global anchor) so the worker is
+    // instantly visible/dispatchable next to the customer; prod uses the hub zone.
+    let dutyZoneId = w.hub?.zoneId ?? null;
+    let dutyLat = lat, dutyLng = lng;
+    if (config.isDev) {
+      const rawAnchor = await redis.get(anchorKey());
+      if (rawAnchor) {
+        const a = JSON.parse(rawAnchor) as DevAnchor;
+        dutyZoneId = a.zoneId;
+        const distM = Math.hypot(a.lat - lat, a.lng - lng) * 111_000;
+        if (distM > 2000) { dutyLat = a.lat + 0.001; dutyLng = a.lng + 0.001; }
+      }
+    }
+    if (dutyZoneId) await redis.geoadd(geoKey(dutyZoneId), dutyLng, dutyLat, `worker:${w.id}`);
+    await redis.hset(`worker:${w.id}:live`, { lat: dutyLat, lng: dutyLng, duty: 'IDLE', idleSince: Date.now(), zoneId: dutyZoneId ?? '' });
+    await redis.expire(`worker:${w.id}:live`, WORKER_LIVENESS_TTL_S);
   } else {
     if (w.duty === 'ON_JOB' || w.duty === 'EN_ROUTE') throw new HttpError(409, 'Finish your active job first');
     const open = await db.attendance.findFirst({

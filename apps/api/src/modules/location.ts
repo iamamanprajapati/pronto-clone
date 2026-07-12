@@ -4,7 +4,7 @@ import {
   ANON_GRID_DEG, channels, EV, SNAPSHOT_INTERVAL_MS, WORKER_LIVENESS_TTL_S, type ZoneSnapshot,
 } from '@pronto/shared';
 import { db } from '../db';
-import { anchorKey, geoKey, liveKey, routeKey, redis } from '../redis';
+import { anchorKey, geoKey, liveKey, routeKey, redis, type DevAnchor } from '../redis';
 
 /** How long the simulated worker takes to reach the customer (dev only). */
 const ROUTE_TRAVEL_MS = 90_000;
@@ -36,11 +36,17 @@ locationRouter.post('/batch', requireAuth('WORKER'), h(async (req, res) => {
   });
   if (!worker || worker.duty === 'OFF_DUTY') return res.json({ ok: true, ignored: true });
 
-  // Dev accommodation (production keeps real coordinates untouched):
-  //  • EN_ROUTE → animate along the stored route toward the customer's door.
-  //  • otherwise → cluster near the active customer so the expert shows up next
-  //    to them (falling back to snapping into the hub zone).
-  if (config.isDev && worker.hub?.zoneId) {
+  // Dev accommodation (production keeps real coordinates + hub zone untouched):
+  //  • the worker registers in the SAME zone as the active tester (global anchor),
+  //    so customer map, dispatch and worker pings can never diverge by zone;
+  //  • EN_ROUTE → animate along the stored route toward the customer's door;
+  //  • IDLE far from the tester → keep real coords (two devices in the same room
+  //    are already "near"); if there's no anchor yet, fall back to the hub zone.
+  let zoneId = worker.hub?.zoneId ?? null;
+  if (config.isDev) {
+    const rawAnchor = await redis.get(anchorKey());
+    const anchor = rawAnchor ? (JSON.parse(rawAnchor) as DevAnchor) : null;
+    if (anchor) zoneId = anchor.zoneId;
     if (worker.duty === 'EN_ROUTE') {
       const b = await db.booking.findFirst({ where: { workerId, status: 'EN_ROUTE' }, select: { id: true } });
       const raw = b && await redis.get(routeKey(b.id));
@@ -49,22 +55,25 @@ locationRouter.post('/batch', requireAuth('WORKER'), h(async (req, res) => {
         const frac = Math.min(1, (Date.now() - r.startAt) / ROUTE_TRAVEL_MS);
         last = { lat: r.startLat + (r.destLat - r.startLat) * frac, lng: r.startLng + (r.destLng - r.startLng) * frac };
       }
-    } else {
-      const raw = await redis.get(anchorKey(worker.hub.zoneId));
-      if (raw) {
-        const a = JSON.parse(raw) as { lat: number; lng: number };
-        last = { lat: a.lat + (Math.random() - 0.5) * 0.003, lng: a.lng + (Math.random() - 0.5) * 0.003 };
-      } else if (worker.hub.zone && !pointInPolygon(last.lat, last.lng, worker.hub.zone.polygon as number[][])) {
-        last = { lat: worker.hub.lat + (Math.random() - 0.5) * 0.004, lng: worker.hub.lng + (Math.random() - 0.5) * 0.004 };
+    } else if (anchor) {
+      // if the worker's real GPS is far from the tester (>2km), pull them nearby
+      const distM = Math.hypot(anchor.lat - last.lat, anchor.lng - last.lng) * 111_000;
+      if (distM > 2000) {
+        last = { lat: anchor.lat + (Math.random() - 0.5) * 0.003, lng: anchor.lng + (Math.random() - 0.5) * 0.003 };
       }
+    } else if (worker.hub?.zone && !pointInPolygon(last.lat, last.lng, worker.hub.zone.polygon as number[][])) {
+      last = { lat: worker.hub.lat + (Math.random() - 0.5) * 0.004, lng: worker.hub.lng + (Math.random() - 0.5) * 0.004 };
     }
   }
 
-  const zoneId = worker.hub?.zoneId;
+  const existing = await redis.hgetall(liveKey(workerId));
+  // if the worker's effective zone changed, drop them from the old zone's geo set
+  if (existing.zoneId && existing.zoneId !== (zoneId ?? '')) {
+    await redis.zrem(geoKey(existing.zoneId), `worker:${workerId}`);
+  }
   if (zoneId) {
     await redis.geoadd(geoKey(zoneId), last.lng, last.lat, `worker:${workerId}`);
   }
-  const existing = await redis.hgetall(liveKey(workerId));
   await redis.hset(liveKey(workerId), {
     lat: last.lat, lng: last.lng,
     duty: worker.duty,
@@ -94,33 +103,21 @@ locationRouter.post('/batch', requireAuth('WORKER'), h(async (req, res) => {
 
 const snap = (v: number) => Math.round(v / ANON_GRID_DEG) * ANON_GRID_DEG;
 
-// A ring of offsets (~150–350m) placing demo experts around the customer.
-const DEMO_OFFSETS = [
-  [0.0022, 0.0011], [-0.0018, 0.0025], [0.0009, -0.0026], [-0.0027, -0.0009],
-];
-
-/** Dev-only: keep a few idle "demo" experts alive around the active customer so
- *  the map is never empty. They are visual only — dispatch skips them (no DB row). */
-async function ensureDemoExperts(zoneId: string) {
-  if (!config.isDev) return;
-  const raw = await redis.get(anchorKey(zoneId));
-  if (!raw) return;
-  const a = JSON.parse(raw) as { lat: number; lng: number };
-  for (let i = 0; i < DEMO_OFFSETS.length; i++) {
-    const lat = a.lat + DEMO_OFFSETS[i][0];
-    const lng = a.lng + DEMO_OFFSETS[i][1];
-    const id = `demo${i}`;
-    await redis.geoadd(geoKey(zoneId), lng, lat, `worker:${id}`);
-    await redis.hset(liveKey(id), { lat, lng, duty: 'IDLE', idleSince: Date.now(), zoneId });
-    await redis.expire(liveKey(id), WORKER_LIVENESS_TTL_S);
+/** One-time cleanup of legacy fake "demo" experts (feature removed — only real
+ *  on-duty workers appear on maps now). */
+export async function cleanupDemoExperts() {
+  const zones = await db.zone.findMany({ select: { id: true } });
+  for (const z of zones) {
+    await redis.zrem(geoKey(z.id), 'worker:demo0', 'worker:demo1', 'worker:demo2', 'worker:demo3');
   }
+  const keys = await redis.keys('worker:demo*');
+  if (keys.length) await redis.del(...keys);
 }
 
 /** Push live snapshot for a specific zone to connected clients. */
 export async function pushSnapshotForZone(zoneId: string) {
   const zone = await db.zone.findUnique({ where: { id: zoneId } });
   if (!zone || !zone.active) return;
-  await ensureDemoExperts(zone.id);
   const members = await redis.zrange(geoKey(zone.id), 0, -1);
 
   const workers: ZoneSnapshot['workers'] = [];
@@ -163,6 +160,7 @@ export async function pushSnapshotForZone(zoneId: string) {
 
 /** Build + publish snapshots for every active zone. Started from index.ts. */
 export function startSnapshotLoop() {
+  cleanupDemoExperts().catch(() => {});
   setInterval(async () => {
     try {
       const zones = await db.zone.findMany({ where: { active: true } });

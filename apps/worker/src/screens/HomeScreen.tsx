@@ -7,6 +7,7 @@ import { useStore } from '../store';
 import { currentPosition, startPinger, stopPinger } from '../location';
 import { Btn, C, Card, H1, IconCircle, Muted } from '../ui';
 import { MCI } from '../icons';
+import { AppMap, type MapPin } from '../AppMap';
 
 export default function HomeScreen({ navigation }: any) {
   const { profile, setProfile, setOffer, setActiveJobId } = useStore();
@@ -14,8 +15,19 @@ export default function HomeScreen({ navigation }: any) {
   const [summary, setSummary] = useState<any>(null);
   const [announcements, setAnnouncements] = useState<any[]>([]);
   const [busy, setBusy] = useState(false);
+  const [myPos, setMyPos] = useState<{ lat: number; lng: number } | null>(null);
 
   const onDuty = profile?.duty !== 'OFF_DUTY';
+
+  // keep own position fresh for the on-duty map
+  useEffect(() => {
+    if (!onDuty) { setMyPos(null); return; }
+    let alive = true;
+    const update = () => currentPosition().then(p => { if (alive) setMyPos(p); }).catch(() => {});
+    update();
+    const t = setInterval(update, 15_000);
+    return () => { alive = false; clearInterval(t); };
+  }, [onDuty]);
 
   const load = () => Promise.all([
     api('/v1/workforce/me').then(r => setProfile(r.worker)),
@@ -81,6 +93,21 @@ export default function HomeScreen({ navigation }: any) {
         </View>
         <Switch value={onDuty} onValueChange={toggleDuty} disabled={busy || profile?.status !== 'ACTIVE'} trackColor={{ true: C.accent }} />
       </Card>
+
+      {onDuty && myPos && (
+        <View style={{ height: 200, borderRadius: 20, overflow: 'hidden', borderWidth: 1, borderColor: C.border }}>
+          <AppMap
+            center={myPos}
+            delta={0.012}
+            markers={[
+              { id: 'me', lat: myPos.lat, lng: myPos.lng, kind: 'expert', label: 'You (on duty)' },
+              ...(profile?.hub
+                ? [{ id: 'hub', lat: profile.hub.lat, lng: profile.hub.lng, kind: 'pin', label: profile.hub.name } as MapPin]
+                : []),
+            ]}
+          />
+        </View>
+      )}
 
       {summary && (
         <Card>
