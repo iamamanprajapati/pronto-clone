@@ -58,9 +58,23 @@ export function stopPinger() {
   last = null;
 }
 
-export async function currentPosition() {
+/**
+ * Fast position lookup — never blocks the UI on a cold GPS fix.
+ * Order: pinger's live cache → OS last-known fix (instant) → fresh fix
+ * raced against a 4s timeout → demo fallback.
+ */
+export async function currentPosition(): Promise<{ lat: number; lng: number }> {
+  if (last) return last;
   const { status } = await Location.requestForegroundPermissionsAsync();
   if (status !== 'granted') return { lat: 12.9116, lng: 77.6389 }; // hub fallback for demo
-  const pos = await Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-  return { lat: pos.coords.latitude, lng: pos.coords.longitude };
+  try {
+    const cached = await Location.getLastKnownPositionAsync();
+    if (cached) return { lat: cached.coords.latitude, lng: cached.coords.longitude };
+  } catch { /* fall through */ }
+  const fresh = await Promise.race([
+    Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced }).catch(() => null),
+    new Promise<null>(resolve => setTimeout(() => resolve(null), 4000)),
+  ]);
+  if (fresh) return { lat: fresh.coords.latitude, lng: fresh.coords.longitude };
+  return { lat: 12.9116, lng: 77.6389 };
 }

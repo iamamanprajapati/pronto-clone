@@ -62,13 +62,18 @@ export default function HomeScreen({ navigation }: any) {
   }, []);
 
   async function toggleDuty(on: boolean) {
+    if (busy) return;
     setBusy(true);
+    // Optimistic: flip the UI immediately; revert only if the server rejects.
+    const prev = profile;
+    if (profile) setProfile({ ...profile, duty: on ? 'IDLE' : 'OFF_DUTY' });
     try {
-      const pos = await currentPosition();
+      const pos = await currentPosition(); // fast: cached/last-known, never a cold GPS wait
       await api('/v1/workforce/duty', { method: 'POST', body: JSON.stringify({ on, ...pos }) });
       if (on) startPinger(); else stopPinger();
-      await load();
+      load(); // background refresh — don't block the toggle on 4 requests
     } catch (e) {
+      if (prev) setProfile(prev); // revert the optimistic flip
       Alert.alert('Duty', (e as Error).message);
     } finally { setBusy(false); }
   }
