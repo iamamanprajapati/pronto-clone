@@ -133,7 +133,7 @@ export default function HomeScreen({ navigation }: any) {
         <Text style={{ fontSize: 17, fontWeight: '800', color: C.text }}>What do you need help with?</Text>
         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
           {services.map(s => (
-            <Pressable key={s.id} onPress={() => setSheetOpen(true)}
+            <Pressable key={s.id} disabled={soldOut} onPress={() => setSheetOpen(true)}
               style={{ width: '30.5%', backgroundColor: 'white', borderRadius: 20, padding: 12, alignItems: 'center', borderWidth: 1, borderColor: C.border, opacity: soldOut ? 0.45 : 1 }}>
               <IconCircle size={48}><ServiceIcon icon={s.icon} size={24} /></IconCircle>
               <Text style={{ fontSize: 12, fontWeight: '600', color: C.text, textAlign: 'center', marginTop: 8 }}>{s.name}</Text>
@@ -147,7 +147,8 @@ export default function HomeScreen({ navigation }: any) {
         </View>
 
         <Btn
-          title={soldOut ? 'Sold out — schedule for later' : 'Book now — expert in ~10 min'}
+          title={soldOut ? 'Sold out' : 'Book now — expert in ~10 min'}
+          disabled={soldOut}
           onPress={() => setSheetOpen(true)}
         />
 
